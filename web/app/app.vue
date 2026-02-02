@@ -59,6 +59,7 @@ const searchInput = ref('')
 const dishes = ref<Dish[]>([])
 const selectedDish = ref<DishDetail | null>(null)
 const youtubeVideos = ref<YouTubeVideo[]>([])
+const selectedVideo = ref<YouTubeVideo | null>(null)
 const hasYoutubeApiKey = ref(true)
 const isLoading = ref(false)
 const isLoadingDetail = ref(false)
@@ -151,6 +152,12 @@ async function fetchYoutubeVideos(dishName: string) {
 function closeDetail() {
   selectedDish.value = null
   youtubeVideos.value = []
+  selectedVideo.value = null
+}
+
+// 영상 선택
+function selectVideo(video: YouTubeVideo) {
+  selectedVideo.value = video
 }
 
 // 재료 선택 변경시 자동 검색
@@ -392,43 +399,73 @@ watch(selectedIngredients, () => {
                 영상 검색 중...
               </div>
 
-              <!-- 영상 목록 -->
-              <div v-else-if="youtubeVideos.length > 0" class="space-y-3">
-                <a
-                  v-for="video in youtubeVideos"
-                  :key="video.id"
-                  :href="`https://www.youtube.com/watch?v=${video.id}`"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="flex gap-3 bg-primary-50 hover:bg-primary-100 rounded-xl p-2 transition-all"
-                >
-                  <div class="w-32 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-primary-200 relative">
-                    <img
-                      :src="video.thumbnail"
-                      :alt="video.title"
-                      class="w-full h-full object-cover"
-                    />
-                    <!-- Play 버튼 오버레이 -->
-                    <div class="absolute inset-0 flex items-center justify-center bg-black/30">
-                      <div class="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center">
-                        <svg class="w-5 h-5 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
+              <!-- 영상 있을 때 -->
+              <div v-else-if="youtubeVideos.length > 0" class="space-y-4">
+                <!-- 상단 플레이어 -->
+                <div class="rounded-2xl overflow-hidden bg-black aspect-video">
+                  <iframe
+                    v-if="selectedVideo"
+                    :src="`https://www.youtube.com/embed/${selectedVideo.id}?autoplay=1`"
+                    class="w-full h-full"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen
+                  ></iframe>
+                  <!-- 영상 미선택 시 안내 -->
+                  <div v-else class="w-full h-full flex flex-col items-center justify-center text-white/70">
+                    <svg class="w-16 h-16 mb-2" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    <p class="text-sm">아래에서 영상을 선택하세요</p>
+                  </div>
+                </div>
+
+                <!-- 선택된 영상 정보 -->
+                <div v-if="selectedVideo" class="px-1">
+                  <p class="font-medium text-primary-900 text-sm">{{ selectedVideo.title }}</p>
+                  <p class="text-xs text-primary-500 mt-1">{{ selectedVideo.channelTitle }}</p>
+                </div>
+
+                <!-- 영상 목록 (가로 스크롤) -->
+                <div class="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+                  <button
+                    v-for="video in youtubeVideos"
+                    :key="video.id"
+                    @click="selectVideo(video)"
+                    :class="[
+                      'flex-shrink-0 w-36 rounded-xl overflow-hidden transition-all',
+                      selectedVideo?.id === video.id
+                        ? 'ring-2 ring-red-500 ring-offset-2'
+                        : 'hover:opacity-80'
+                    ]"
+                  >
+                    <div class="relative aspect-video bg-primary-200">
+                      <img
+                        :src="video.thumbnail"
+                        :alt="video.title"
+                        class="w-full h-full object-cover"
+                      />
+                      <!-- Play 오버레이 -->
+                      <div class="absolute inset-0 flex items-center justify-center bg-black/30">
+                        <div class="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
+                          <svg class="w-4 h-4 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div class="flex-1 min-w-0 py-1">
-                    <p class="font-medium text-primary-900 text-sm line-clamp-2">{{ video.title }}</p>
-                    <p class="text-xs text-primary-500 mt-1">{{ video.channelTitle }}</p>
-                  </div>
-                </a>
+                    <div class="p-2 bg-primary-50">
+                      <p class="text-xs text-primary-900 line-clamp-2 text-left">{{ video.title }}</p>
+                    </div>
+                  </button>
+                </div>
 
                 <!-- 더보기 링크 -->
                 <a
                   :href="`https://www.youtube.com/results?search_query=${encodeURIComponent(selectedDish.dish.name + ' 레시피')}`"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="block text-center text-sm text-primary-500 hover:text-primary-700 py-2"
+                  class="block text-center text-sm text-primary-500 hover:text-primary-700"
                 >
                   YouTube에서 더 보기 →
                 </a>
@@ -472,5 +509,12 @@ watch(selectedIngredients, () => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 </style>
