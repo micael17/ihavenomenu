@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 기본 스타일 */
+body {
+  @apply bg-white text-primary-900;
+}
+
+/* 둥근 버튼 스타일 */
+.btn {
+  @apply px-4 py-2 rounded-xl font-medium transition-all duration-200;
+}
+
+.btn-primary {
+  @apply bg-primary-900 text-white hover:bg-primary-700;
+}
+
+.btn-secondary {
+  @apply bg-primary-100 text-primary-900 hover:bg-primary-200;
+}
+
+/* 카드 스타일 */
+.card {
+  @apply bg-white border border-primary-200 rounded-2xl p-4 shadow-sm;
+}
+
+/* 입력 필드 스타일 */
+.input {
+  @apply w-full px-4 py-3 border border-primary-200 rounded-xl
+         focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent
+         transition-all duration-200;
+}
+
+/* 태그/뱃지 스타일 */
+.tag {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+         bg-primary-100 text-primary-700;
+}
+
+.tag-selected {
+  @apply bg-primary-900 text-white;
+}
