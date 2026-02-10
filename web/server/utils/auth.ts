@@ -3,7 +3,7 @@ import type { H3Event } from 'h3'
 import { getCookie, setCookie, deleteCookie, createError } from 'h3'
 import { findUserById, type User } from './user-db'
 
-const TOKEN_NAME = 'momokdi_token'
+const TOKEN_NAME = 'ihavenomenu_token'
 const TOKEN_MAX_AGE = 60 * 60 * 24 * 7 // 7일
 
 export interface JwtPayload {

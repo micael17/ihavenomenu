@@ -1,6 +1,6 @@
-# 모목디 (뭐먹지?)
+# I Have No Menu
 
-냉장고 재료로 만들 수 있는 요리를 찾아주는 서비스
+내가 가진 재료로 만들 수 있는 요리를 찾아주는 서비스
 
 ## 기능
 
@@ -9,6 +9,7 @@
 - 요리 검색 결과 (일치 재료 많은 순 정렬)
 - 요리 상세 보기 (필요한 재료, 레시피)
 - YouTube 레시피 영상 연동
+- 크리에이터 레시피 등록 및 공유
 
 ## 기술 스택
 
@@ -37,7 +38,7 @@ YOUTUBE_API_KEY=your_youtube_api_key  # YouTube 영상 표시용 (선택)
 
 ## 데이터베이스
 
-- `database/momokdi.db`: SQLite 데이터베이스
+- `database/ihavenomenu.db`: SQLite 데이터베이스
 - `database/schema.sql`: 스키마 정의
 - `scripts/parse_csv.py`: CSV 파싱 스크립트
 - `scripts/normalize_ingredients.py`: 재료 정규화 스크립트
@@ -45,15 +46,15 @@ YOUTUBE_API_KEY=your_youtube_api_key  # YouTube 영상 표시용 (선택)
 ## 프로젝트 구조
 
 ```
-momokdi/
+ihavenomenu/
 ├── database/
-│   ├── momokdi.db          # SQLite DB
+│   ├── ihavenomenu.db      # SQLite DB
 │   └── schema.sql          # 스키마
 ├── scripts/
 │   ├── parse_csv.py        # CSV 파싱
 │   └── normalize_ingredients.py  # 재료 정규화
 └── web/                    # Nuxt 3 프로젝트
-    ├── app/app.vue         # 메인 UI
+    ├── app/                # Vue 컴포넌트
     ├── server/api/         # API 엔드포인트
     └── ...
 ```

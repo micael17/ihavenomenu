@@ -6,7 +6,7 @@ let userDb: Database.Database | null = null
 export function useUserDB(): Database.Database {
   if (userDb) return userDb
 
-  const dbPath = resolve(process.cwd(), '../database/momokdi.db')
+  const dbPath = resolve(process.cwd(), '../database/ihavenomenu.db')
 
   console.log('[UserDB] Connecting to:', dbPath)
 
@@ -62,6 +62,69 @@ function initUserTables(db: Database.Database) {
     )
   `)
 
+  // 크리에이터 테이블
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS creators (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE,
+      youtube_channel_url TEXT,
+      channel_name TEXT,
+      channel_thumbnail TEXT,
+      recipe_count INTEGER DEFAULT 0,
+      total_views INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `)
+
+  // 사용자 레시피 테이블
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_recipes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      creator_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      category TEXT,
+      cooking_time INTEGER,
+      difficulty TEXT,
+      youtube_video_id TEXT,
+      youtube_thumbnail TEXT,
+      image_url TEXT,
+      view_count INTEGER DEFAULT 0,
+      like_count INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'published',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (creator_id) REFERENCES creators(id)
+    )
+  `)
+
+  // 사용자 레시피 재료 테이블
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_recipe_ingredients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recipe_id INTEGER NOT NULL,
+      ingredient_id INTEGER,
+      custom_name TEXT,
+      amount TEXT,
+      is_main INTEGER DEFAULT 0,
+      FOREIGN KEY (recipe_id) REFERENCES user_recipes(id) ON DELETE CASCADE,
+      FOREIGN KEY (ingredient_id) REFERENCES ingredients(id)
+    )
+  `)
+
+  // 조리법 단계 테이블
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_recipe_steps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recipe_id INTEGER NOT NULL,
+      step_number INTEGER NOT NULL,
+      description TEXT NOT NULL,
+      image_url TEXT,
+      FOREIGN KEY (recipe_id) REFERENCES user_recipes(id) ON DELETE CASCADE
+    )
+  `)
+
   console.log('[UserDB] Tables initialized')
 }
 
@@ -83,6 +146,52 @@ export interface UserIngredient {
   ingredient_id: number
   expiry_date: string | null
   created_at: string
+}
+
+export interface Creator {
+  id: number
+  user_id: number
+  youtube_channel_url: string | null
+  channel_name: string | null
+  channel_thumbnail: string | null
+  recipe_count: number
+  total_views: number
+  created_at: string
+}
+
+export interface UserRecipe {
+  id: number
+  creator_id: number
+  title: string
+  description: string | null
+  category: string | null
+  cooking_time: number | null
+  difficulty: string | null
+  youtube_video_id: string | null
+  youtube_thumbnail: string | null
+  image_url: string | null
+  view_count: number
+  like_count: number
+  status: 'draft' | 'published'
+  created_at: string
+  updated_at: string
+}
+
+export interface UserRecipeIngredient {
+  id: number
+  recipe_id: number
+  ingredient_id: number | null
+  custom_name: string | null
+  amount: string | null
+  is_main: number
+}
+
+export interface UserRecipeStep {
+  id: number
+  recipe_id: number
+  step_number: number
+  description: string
+  image_url: string | null
 }
 
 // 사용자 조회/생성
@@ -269,4 +378,233 @@ export function getExpiringIngredients(userId: number) {
       AND julianday(ui.expiry_date) - julianday('now') <= 3
     ORDER BY ui.expiry_date ASC
   `).all(userId)
+}
+
+// ==================== 크리에이터 관련 ====================
+
+export function getCreatorByUserId(userId: number): Creator | undefined {
+  const db = useUserDB()
+  return db.prepare('SELECT * FROM creators WHERE user_id = ?').get(userId) as Creator | undefined
+}
+
+export function createCreator(
+  userId: number,
+  youtubeChannelUrl?: string,
+  channelName?: string,
+  channelThumbnail?: string
+): Creator {
+  const db = useUserDB()
+  const result = db.prepare(`
+    INSERT INTO creators (user_id, youtube_channel_url, channel_name, channel_thumbnail)
+    VALUES (?, ?, ?, ?)
+  `).run(userId, youtubeChannelUrl || null, channelName || null, channelThumbnail || null)
+
+  return {
+    id: result.lastInsertRowid as number,
+    user_id: userId,
+    youtube_channel_url: youtubeChannelUrl || null,
+    channel_name: channelName || null,
+    channel_thumbnail: channelThumbnail || null,
+    recipe_count: 0,
+    total_views: 0,
+    created_at: new Date().toISOString()
+  }
+}
+
+export function updateCreator(
+  creatorId: number,
+  data: { youtube_channel_url?: string; channel_name?: string; channel_thumbnail?: string }
+) {
+  const db = useUserDB()
+  const updates: string[] = []
+  const values: any[] = []
+
+  if (data.youtube_channel_url !== undefined) {
+    updates.push('youtube_channel_url = ?')
+    values.push(data.youtube_channel_url)
+  }
+  if (data.channel_name !== undefined) {
+    updates.push('channel_name = ?')
+    values.push(data.channel_name)
+  }
+  if (data.channel_thumbnail !== undefined) {
+    updates.push('channel_thumbnail = ?')
+    values.push(data.channel_thumbnail)
+  }
+
+  if (updates.length === 0) return { updated: false }
+
+  values.push(creatorId)
+  db.prepare(`UPDATE creators SET ${updates.join(', ')} WHERE id = ?`).run(...values)
+  return { updated: true }
+}
+
+// ==================== 사용자 레시피 관련 ====================
+
+export function createUserRecipe(
+  creatorId: number,
+  data: {
+    title: string
+    description?: string
+    category?: string
+    cooking_time?: number
+    difficulty?: string
+    youtube_video_id?: string
+    youtube_thumbnail?: string
+    image_url?: string
+    status?: 'draft' | 'published'
+  }
+): number {
+  const db = useUserDB()
+  const result = db.prepare(`
+    INSERT INTO user_recipes (
+      creator_id, title, description, category, cooking_time,
+      difficulty, youtube_video_id, youtube_thumbnail, image_url, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    creatorId,
+    data.title,
+    data.description || null,
+    data.category || null,
+    data.cooking_time || null,
+    data.difficulty || null,
+    data.youtube_video_id || null,
+    data.youtube_thumbnail || null,
+    data.image_url || null,
+    data.status || 'published'
+  )
+
+  // 크리에이터의 레시피 카운트 증가
+  db.prepare('UPDATE creators SET recipe_count = recipe_count + 1 WHERE id = ?').run(creatorId)
+
+  return result.lastInsertRowid as number
+}
+
+export function addRecipeIngredients(
+  recipeId: number,
+  ingredients: Array<{
+    ingredient_id?: number
+    custom_name?: string
+    amount?: string
+    is_main?: boolean
+  }>
+) {
+  const db = useUserDB()
+  const stmt = db.prepare(`
+    INSERT INTO user_recipe_ingredients (recipe_id, ingredient_id, custom_name, amount, is_main)
+    VALUES (?, ?, ?, ?, ?)
+  `)
+
+  for (const ing of ingredients) {
+    stmt.run(
+      recipeId,
+      ing.ingredient_id || null,
+      ing.custom_name || null,
+      ing.amount || null,
+      ing.is_main ? 1 : 0
+    )
+  }
+}
+
+export function addRecipeSteps(
+  recipeId: number,
+  steps: Array<{ description: string; image_url?: string }>
+) {
+  const db = useUserDB()
+  const stmt = db.prepare(`
+    INSERT INTO user_recipe_steps (recipe_id, step_number, description, image_url)
+    VALUES (?, ?, ?, ?)
+  `)
+
+  steps.forEach((step, index) => {
+    stmt.run(recipeId, index + 1, step.description, step.image_url || null)
+  })
+}
+
+export function getUserRecipeById(recipeId: number) {
+  const db = useUserDB()
+
+  const recipe = db.prepare(`
+    SELECT ur.*, c.channel_name, c.youtube_channel_url, u.nickname, u.profile_image
+    FROM user_recipes ur
+    JOIN creators c ON ur.creator_id = c.id
+    JOIN users u ON c.user_id = u.id
+    WHERE ur.id = ?
+  `).get(recipeId) as any
+
+  if (!recipe) return null
+
+  const ingredients = db.prepare(`
+    SELECT uri.*, i.name as ingredient_name, i.category as ingredient_category
+    FROM user_recipe_ingredients uri
+    LEFT JOIN ingredients i ON uri.ingredient_id = i.id
+    WHERE uri.recipe_id = ?
+  `).all(recipeId)
+
+  const steps = db.prepare(`
+    SELECT * FROM user_recipe_steps WHERE recipe_id = ? ORDER BY step_number
+  `).all(recipeId)
+
+  return { ...recipe, ingredients, steps }
+}
+
+export function getUserRecipesByCreator(creatorId: number, status?: string) {
+  const db = useUserDB()
+  let query = 'SELECT * FROM user_recipes WHERE creator_id = ?'
+  const params: any[] = [creatorId]
+
+  if (status) {
+    query += ' AND status = ?'
+    params.push(status)
+  }
+
+  query += ' ORDER BY created_at DESC'
+  return db.prepare(query).all(...params)
+}
+
+export function searchUserRecipesByIngredients(ingredientIds: number[]) {
+  if (ingredientIds.length === 0) return []
+
+  const db = useUserDB()
+  const placeholders = ingredientIds.map(() => '?').join(',')
+
+  return db.prepare(`
+    SELECT
+      ur.*,
+      c.channel_name,
+      c.youtube_channel_url,
+      u.nickname,
+      u.profile_image,
+      COUNT(DISTINCT uri.ingredient_id) as match_count,
+      (SELECT COUNT(*) FROM user_recipe_ingredients WHERE recipe_id = ur.id) as total_ingredients
+    FROM user_recipes ur
+    JOIN creators c ON ur.creator_id = c.id
+    JOIN users u ON c.user_id = u.id
+    JOIN user_recipe_ingredients uri ON ur.id = uri.recipe_id
+    WHERE ur.status = 'published'
+      AND uri.ingredient_id IN (${placeholders})
+    GROUP BY ur.id
+    ORDER BY match_count DESC, ur.view_count DESC
+  `).all(...ingredientIds)
+}
+
+export function incrementRecipeViewCount(recipeId: number) {
+  const db = useUserDB()
+  db.prepare('UPDATE user_recipes SET view_count = view_count + 1 WHERE id = ?').run(recipeId)
+}
+
+export function deleteUserRecipe(recipeId: number, creatorId: number) {
+  const db = useUserDB()
+
+  // 해당 크리에이터의 레시피인지 확인
+  const recipe = db.prepare('SELECT creator_id FROM user_recipes WHERE id = ?').get(recipeId) as any
+  if (!recipe || recipe.creator_id !== creatorId) {
+    return { deleted: false, error: 'not_found_or_unauthorized' }
+  }
+
+  // 관련 데이터는 CASCADE로 자동 삭제
+  db.prepare('DELETE FROM user_recipes WHERE id = ?').run(recipeId)
+  db.prepare('UPDATE creators SET recipe_count = recipe_count - 1 WHERE id = ?').run(creatorId)
+
+  return { deleted: true }
 }

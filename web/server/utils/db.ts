@@ -7,7 +7,7 @@ export function useDB(): Database.Database {
   if (db) return db
 
   // 절대 경로로 DB 파일 지정 (프로젝트 루트의 database 폴더)
-  const dbPath = resolve(process.cwd(), '../database/momokdi.db')
+  const dbPath = resolve(process.cwd(), '../database/ihavenomenu.db')
 
   console.log('[DB] Connecting to:', dbPath)
 
