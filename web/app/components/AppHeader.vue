@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const { t } = useI18n()
 const route = useRoute()
 const { user, isLoggedIn, logout } = useAuth()
 
@@ -34,7 +35,7 @@ function handleLogin() {
                 isActive('/') ? 'text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-900'
               ]"
             >
-              레시피 검색
+              {{ t('nav.recipeSearch') }}
             </NuxtLink>
             <NuxtLink
               to="/my-fridge"
@@ -42,7 +43,7 @@ function handleLogin() {
                 isActive('/my-fridge') ? 'text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-900'
               ]"
             >
-              내 재료
+              {{ t('nav.myIngredients') }}
             </NuxtLink>
           </nav>
         </div>
@@ -57,7 +58,7 @@ function handleLogin() {
               <img
                 v-if="user?.profileImage"
                 :src="user.profileImage"
-                :alt="user.nickname || '프로필'"
+                :alt="user.nickname || t('common.profile')"
                 class="w-full h-full object-cover"
               />
               <span v-else class="text-sm text-gray-500">{{ user?.nickname?.charAt(0) || '?' }}</span>
@@ -82,13 +83,13 @@ function handleLogin() {
               class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
               @click="showUserMenu = false"
             >
-              대시보드
+              {{ t('nav.dashboard') }}
             </NuxtLink>
             <button
               @click="handleLogout"
               class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             >
-              로그아웃
+              {{ t('common.logout') }}
             </button>
           </div>
         </div>
@@ -99,7 +100,7 @@ function handleLogin() {
           @click="handleLogin"
           class="px-4 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800"
         >
-          로그인
+          {{ t('common.login') }}
         </button>
       </div>
     </div>

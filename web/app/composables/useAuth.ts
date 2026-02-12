@@ -3,7 +3,7 @@ interface User {
   nickname: string | null
   email: string | null
   profileImage: string | null
-  provider: 'kakao' | 'naver'
+  provider: 'google'
   onboarding_completed: boolean
 }
 
@@ -37,12 +37,8 @@ export function useAuth() {
     }
   }
 
-  function loginWithKakao() {
-    window.location.href = '/api/auth/kakao/login'
-  }
-
-  function loginWithNaver() {
-    window.location.href = '/api/auth/naver/login'
+  function loginWithGoogle() {
+    window.location.href = '/api/auth/google/login'
   }
 
   const isLoggedIn = computed(() => !!user.value)
@@ -58,7 +54,6 @@ export function useAuth() {
     isLoggedIn,
     fetchUser,
     logout,
-    loginWithKakao,
-    loginWithNaver
+    loginWithGoogle
   }
 }

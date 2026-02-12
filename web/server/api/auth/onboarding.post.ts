@@ -21,10 +21,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  if (body.nickname.trim().length > 10) {
+  if (body.nickname.trim().length > 20) {
     throw createError({
       statusCode: 400,
-      message: '닉네임은 10자 이하여야 합니다'
+      message: '닉네임은 20자 이하여야 합니다'
     })
   }
 

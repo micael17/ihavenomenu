@@ -1,25 +1,46 @@
 import { useDB, type Ingredient } from '../../utils/db'
 
+interface IngredientWithPopularity extends Ingredient {
+  usage_count: number
+}
+
 export default defineEventHandler(async (event) => {
   const db = useDB()
   const query = getQuery(event)
   const category = query.category as string | undefined
+  const topLevelOnly = query.topLevelOnly === 'true'
+  const orderByPopularity = query.orderByPopularity === 'true'
 
   let sql = `
-    SELECT id, name, category
-    FROM ingredients
-    WHERE is_base = 1
+    SELECT i.id, i.name, i.category, COALESCE(di_count.usage_count, 0) as usage_count
+    FROM ingredients i
+    LEFT JOIN (
+      SELECT ingredient_id, COUNT(*) as usage_count
+      FROM dish_ingredients
+      GROUP BY ingredient_id
+    ) di_count ON i.id = di_count.ingredient_id
+    WHERE i.is_base = 1
   `
   const params: string[] = []
 
   if (category) {
-    sql += ` AND category = ?`
+    sql += ` AND i.category = ?`
     params.push(category)
   }
 
-  sql += ` ORDER BY category, name`
+  // 상위 카테고리만 (Protein용 - parent_id가 없는 것들만)
+  if (topLevelOnly) {
+    sql += ` AND i.parent_id IS NULL`
+  }
 
-  const ingredients = db.prepare(sql).all(...params) as Ingredient[]
+  // 인기순 또는 이름순 정렬
+  if (orderByPopularity) {
+    sql += ` ORDER BY i.category, usage_count DESC, i.name`
+  } else {
+    sql += ` ORDER BY i.category, i.name`
+  }
+
+  const ingredients = db.prepare(sql).all(...params) as IngredientWithPopularity[]
 
   // 카테고리별로 그룹화
   const grouped = ingredients.reduce((acc, ing) => {
@@ -27,7 +48,7 @@ export default defineEventHandler(async (event) => {
     if (!acc[cat]) acc[cat] = []
     acc[cat].push(ing)
     return acc
-  }, {} as Record<string, Ingredient[]>)
+  }, {} as Record<string, IngredientWithPopularity[]>)
 
   return {
     ingredients,

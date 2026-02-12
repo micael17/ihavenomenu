@@ -1,9 +1,16 @@
 <script setup lang="ts">
+import { Swiper, SwiperSlide } from 'swiper/vue'
+import { EffectCreative } from 'swiper/modules'
+import type { Swiper as SwiperType } from 'swiper'
+import 'swiper/css'
+import 'swiper/css/effect-creative'
+
 definePageMeta({
   layout: false
 })
 
-const { user, isLoggedIn, fetchUser } = useAuth()
+const { t, tm } = useI18n()
+const { user, fetchUser } = useAuth()
 
 // 온보딩 완료된 사용자는 홈으로
 watchEffect(() => {
@@ -12,33 +19,32 @@ watchEffect(() => {
   }
 })
 
+const swiperRef = ref<SwiperType | null>(null)
 const step = ref(1)
 const totalSteps = 4
-const direction = ref<'forward' | 'backward'>('forward')
+
+function onSwiper(swiper: SwiperType) {
+  swiperRef.value = swiper
+}
+
+function onSlideChange(swiper: SwiperType) {
+  step.value = swiper.activeIndex + 1
+}
 
 // Step 1: 닉네임
 const nickname = ref('')
 const nicknameError = ref('')
 const isRolling = ref(false)
 
-// 랜덤 닉네임 생성용 단어들
-const adjectives = [
-  '배고픈', '행복한', '매콤한', '달콤한', '시원한',
-  '뜨거운', '졸린', '신나는', '웃기는', '귀여운',
-  '용감한', '느긋한', '부지런한', '똑똑한', '엉뚱한',
-  '수줍은', '당당한', '호기심많은', '활발한', '차분한'
-]
-
-const nouns = [
-  '페퍼로니', '치즈', '냉장고', '김치', '떡볶이',
-  '파스타', '주먹밥', '고추장', '라면', '만두',
-  '샌드위치', '초밥', '햄버거', '타코', '카레',
-  '짜장면', '피자', '도넛', '케이크', '쿠키'
-]
+// Random nickname generator words from i18n
+const adjectives = computed(() => tm('onboarding.adjectives') as string[])
+const nouns = computed(() => tm('onboarding.nouns') as string[])
 
 function generateRandomNickname() {
-  const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
-  const noun = nouns[Math.floor(Math.random() * nouns.length)]
+  const adjs = adjectives.value
+  const ns = nouns.value
+  const adj = adjs[Math.floor(Math.random() * adjs.length)]
+  const noun = ns[Math.floor(Math.random() * ns.length)]
   const num = String(Math.floor(Math.random() * 99) + 1).padStart(2, '0')
   return `${adj}${noun}${num}`
 }
@@ -46,7 +52,6 @@ function generateRandomNickname() {
 async function rollNickname() {
   isRolling.value = true
 
-  // 여러 번 빠르게 바뀌는 효과
   const iterations = 8
   for (let i = 0; i < iterations; i++) {
     nickname.value = generateRandomNickname()
@@ -57,24 +62,82 @@ async function rollNickname() {
   isRolling.value = false
 }
 
-// Step 2: 좋아하는 요리
+// Step 2: Favorite dishes (Western + Asian)
 const favoriteDishes = ref<string[]>([])
-const dishOptions = [
-  '김치찌개', '된장찌개', '비빔밥', '불고기', '삼겹살',
-  '파스타', '스시', '라멘', '짜장면', '탕수육',
-  '피자', '햄버거', '샐러드', '스테이크', '카레',
-  '쌀국수', '떡볶이', '치킨', '갈비찜', '해물탕'
+// Keys for dishes - used for both display (via i18n) and storage (as keys)
+const dishKeys = [
+  'pizza', 'pasta', 'burger', 'steak', 'tacos',
+  'friedChicken', 'bbqRibs', 'macCheese', 'sandwich', 'salad',
+  'burritos', 'wings', 'fishChips',
+  'sushi', 'ramen', 'curry', 'pho', 'padThai',
+  'koreanBbq', 'bibimbap'
 ]
 
-// Step 3: 싫어하는 재료
+// Step 3: Disliked ingredients
 const dislikedIngredients = ref<string[]>([])
-const ingredientOptions = [
-  '고수', '민트', '올리브', '치즈', '버섯',
-  '해산물', '돼지고기', '소고기', '닭고기', '계란',
-  '우유', '견과류', '매운 음식', '생선', '조개'
+// Keys for ingredients - used for both display (via i18n) and storage (as keys)
+const ingredientKeys = [
+  'cilantro', 'olives', 'mushrooms', 'onions', 'tomatoes',
+  'seafood', 'pork', 'beef', 'chicken', 'eggs',
+  'dairy', 'nuts', 'spicyFood', 'gluten', 'shellfish'
 ]
 
-// Step 4: 내 재료
+// Dietary preferences
+const isVegetarian = ref(false)
+const isVegan = ref(false)
+
+// Use keys for dietary restrictions
+const vegetarianIngredients = ['seafood', 'pork', 'beef', 'chicken', 'shellfish']
+const veganOnlyIngredients = ['eggs', 'dairy'] // Vegan 전용 (Vegetarian은 허용)
+
+function toggleVegetarian() {
+  isVegetarian.value = !isVegetarian.value
+  if (isVegetarian.value) {
+    // Vegan이었다면 Eggs, Dairy 제거
+    if (isVegan.value) {
+      veganOnlyIngredients.forEach(ing => {
+        const index = dislikedIngredients.value.indexOf(ing)
+        if (index >= 0) dislikedIngredients.value.splice(index, 1)
+      })
+    }
+    isVegan.value = false
+    // Add vegetarian restricted ingredients
+    vegetarianIngredients.forEach(ing => {
+      if (!dislikedIngredients.value.includes(ing)) {
+        dislikedIngredients.value.push(ing)
+      }
+    })
+  } else {
+    // Remove meat-related ingredients
+    vegetarianIngredients.forEach(ing => {
+      const index = dislikedIngredients.value.indexOf(ing)
+      if (index >= 0) dislikedIngredients.value.splice(index, 1)
+    })
+  }
+}
+
+function toggleVegan() {
+  isVegan.value = !isVegan.value
+  if (isVegan.value) {
+    isVegetarian.value = false
+    // Add all vegan restricted ingredients
+    const allVeganIngredients = [...vegetarianIngredients, ...veganOnlyIngredients]
+    allVeganIngredients.forEach(ing => {
+      if (!dislikedIngredients.value.includes(ing)) {
+        dislikedIngredients.value.push(ing)
+      }
+    })
+  } else {
+    // Remove all vegan-related ingredients
+    const allVeganIngredients = [...vegetarianIngredients, ...veganOnlyIngredients]
+    allVeganIngredients.forEach(ing => {
+      const index = dislikedIngredients.value.indexOf(ing)
+      if (index >= 0) dislikedIngredients.value.splice(index, 1)
+    })
+  }
+}
+
+// Step 4: My ingredients
 interface IngredientOption {
   id: number
   name: string
@@ -82,78 +145,78 @@ interface IngredientOption {
 }
 
 const myIngredients = ref<{
-  main: IngredientOption | null
+  protein: IngredientOption | null
   sauce: IngredientOption | null
-  grain: IngredientOption | null
+  carb: IngredientOption | null
 }>({
-  main: null,
+  protein: null,
   sauce: null,
-  grain: null
+  carb: null
 })
 
-// 카테고리별 재료 목록
+// English categories from TheMealDB import
 const categoryGroups = {
-  main: ['육류', '해물류', '채소류'],
-  sauce: ['양념류'],
-  grain: ['곡류']
+  protein: ['Meat', 'Seafood'],
+  sauce: ['Seasonings & Sauces'],
+  carb: ['Grains & Pasta']
 }
 
-// 기본 재료 목록 로드
-const { data: baseIngredients } = await useFetch('/api/ingredients/base')
+const { data: baseIngredients } = await useFetch('/api/ingredients/base', {
+  query: { orderByPopularity: 'true' }
+})
 
-// 카테고리별 필터링된 재료
-const mainIngredients = computed(() => {
-  if (!baseIngredients.value?.ingredients) return []
-  return baseIngredients.value.ingredients.filter(
-    (i) => i.category && categoryGroups.main.includes(i.category)
+// Fetch top-level proteins only (parent_id IS NULL)
+const { data: proteinData } = await useFetch('/api/ingredients/base', {
+  query: { topLevelOnly: 'true' }
+})
+
+// Top-level proteins only (Beef, Chicken, Pork - not Ground Beef, Chicken Breast, etc.)
+const proteinIngredients = computed(() => {
+  if (!proteinData.value?.ingredients) return []
+  return proteinData.value.ingredients.filter(
+    (i: IngredientOption) => i.category && categoryGroups.protein.includes(i.category)
   ) as IngredientOption[]
 })
 
 const sauceIngredients = computed(() => {
   if (!baseIngredients.value?.ingredients) return []
   return baseIngredients.value.ingredients.filter(
-    (i) => i.category && categoryGroups.sauce.includes(i.category)
+    (i: IngredientOption) => i.category && categoryGroups.sauce.includes(i.category)
   ) as IngredientOption[]
 })
 
-const grainIngredients = computed(() => {
+const carbIngredients = computed(() => {
   if (!baseIngredients.value?.ingredients) return []
   return baseIngredients.value.ingredients.filter(
-    (i) => i.category && categoryGroups.grain.includes(i.category)
+    (i: IngredientOption) => i.category && categoryGroups.carb.includes(i.category)
   ) as IngredientOption[]
 })
 
-// 검색어 상태
 const searchQueries = ref({
-  main: '',
+  protein: '',
   sauce: '',
-  grain: ''
+  carb: ''
 })
 
-// 검색 결과 상태
 const searchResults = ref<{
-  main: IngredientOption[]
+  protein: IngredientOption[]
   sauce: IngredientOption[]
-  grain: IngredientOption[]
+  carb: IngredientOption[]
 }>({
-  main: [],
+  protein: [],
   sauce: [],
-  grain: []
+  carb: []
 })
 
-// 드롭다운 열림 상태
-const dropdownOpen = ref<{
-  main: boolean
-  sauce: boolean
-  grain: boolean
-}>({
-  main: false,
+const dropdownOpen = ref({
+  protein: false,
   sauce: false,
-  grain: false
+  carb: false
 })
 
-// 검색 함수
-async function searchIngredients(type: 'main' | 'sauce' | 'grain') {
+type IngredientType = 'protein' | 'sauce' | 'carb'
+
+async function searchIngredients(type: IngredientType) {
   const query = searchQueries.value[type].trim()
   if (!query) {
     searchResults.value[type] = []
@@ -167,14 +230,13 @@ async function searchIngredients(type: 'main' | 'sauce' | 'grain') {
   searchResults.value[type] = (results || []) as IngredientOption[]
 }
 
-// 디바운스된 검색
 let searchTimeouts: Record<string, NodeJS.Timeout | null> = {
-  main: null,
+  protein: null,
   sauce: null,
-  grain: null
+  carb: null
 }
 
-function debouncedSearch(type: 'main' | 'sauce' | 'grain') {
+function debouncedSearch(type: IngredientType) {
   if (searchTimeouts[type]) {
     clearTimeout(searchTimeouts[type]!)
   }
@@ -183,44 +245,53 @@ function debouncedSearch(type: 'main' | 'sauce' | 'grain') {
   }, 200)
 }
 
-// 재료 선택
-function selectIngredient(type: 'main' | 'sauce' | 'grain', ingredient: IngredientOption) {
+function selectIngredient(type: IngredientType, ingredient: IngredientOption) {
   myIngredients.value[type] = ingredient
   searchQueries.value[type] = ''
   searchResults.value[type] = []
   dropdownOpen.value[type] = false
 }
 
-// 재료 선택 해제
-function clearIngredient(type: 'main' | 'sauce' | 'grain') {
+function clearIngredient(type: IngredientType) {
   myIngredients.value[type] = null
 }
 
-// 드롭다운 토글
-function toggleDropdown(type: 'main' | 'sauce' | 'grain') {
+function toggleDropdown(type: IngredientType) {
   dropdownOpen.value[type] = !dropdownOpen.value[type]
-  // 다른 드롭다운 닫기
   Object.keys(dropdownOpen.value).forEach(key => {
-    if (key !== type) dropdownOpen.value[key as 'main' | 'sauce' | 'grain'] = false
+    if (key !== type) dropdownOpen.value[key as IngredientType] = false
   })
 }
 
-// 외부 클릭 시 드롭다운 닫기
 function closeAllDropdowns() {
-  dropdownOpen.value.main = false
+  dropdownOpen.value.protein = false
   dropdownOpen.value.sauce = false
-  dropdownOpen.value.grain = false
+  dropdownOpen.value.carb = false
 }
 
 const isSubmitting = ref(false)
+const submitError = ref('')
+
+// 시각적 글자 수 계산
+function getGraphemeLength(str: string): number {
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    const segmenter = new Intl.Segmenter('ko', { granularity: 'grapheme' })
+    return [...segmenter.segment(str)].length
+  }
+  return str.length
+}
+
+const nicknameLength = computed(() => getGraphemeLength(nickname.value.trim()))
+const maxNicknameLength = 20
 
 function validateNickname() {
-  if (nickname.value.trim().length < 2) {
-    nicknameError.value = '2자 이상 입력해주세요'
+  const len = nicknameLength.value
+  if (len < 2) {
+    nicknameError.value = t('onboarding.nicknameMinError')
     return false
   }
-  if (nickname.value.trim().length > 10) {
-    nicknameError.value = '10자 이하로 입력해주세요'
+  if (len > maxNicknameLength) {
+    nicknameError.value = t('onboarding.nicknameMaxError', { max: maxNicknameLength })
     return false
   }
   nicknameError.value = ''
@@ -229,56 +300,50 @@ function validateNickname() {
 
 function nextStep() {
   if (step.value === 1 && !validateNickname()) return
-
-  direction.value = 'forward'
-  step.value++
-}
-
-function isLastStep() {
-  return step.value === totalSteps
+  swiperRef.value?.slideNext()
 }
 
 function prevStep() {
-  direction.value = 'backward'
-  step.value--
+  swiperRef.value?.slidePrev()
 }
 
-function toggleDish(dish: string) {
-  const index = favoriteDishes.value.indexOf(dish)
+function toggleDish(dishKey: string) {
+  const index = favoriteDishes.value.indexOf(dishKey)
   if (index >= 0) {
     favoriteDishes.value.splice(index, 1)
   } else {
-    favoriteDishes.value.push(dish)
+    favoriteDishes.value.push(dishKey)
   }
 }
 
-function toggleIngredient(ingredient: string) {
-  const index = dislikedIngredients.value.indexOf(ingredient)
+function toggleIngredient(ingredientKey: string) {
+  const index = dislikedIngredients.value.indexOf(ingredientKey)
   if (index >= 0) {
     dislikedIngredients.value.splice(index, 1)
   } else {
-    dislikedIngredients.value.push(ingredient)
+    dislikedIngredients.value.push(ingredientKey)
   }
 }
 
 async function completeOnboarding() {
   isSubmitting.value = true
+  submitError.value = ''
+
   try {
-    // 내 재료 ID 추출
     const myIngredientsData: {
-      main?: number
+      protein?: number
       sauce?: number
-      grain?: number
+      carb?: number
     } = {}
 
-    if (myIngredients.value.main) {
-      myIngredientsData.main = myIngredients.value.main.id
+    if (myIngredients.value.protein) {
+      myIngredientsData.protein = myIngredients.value.protein.id
     }
     if (myIngredients.value.sauce) {
       myIngredientsData.sauce = myIngredients.value.sauce.id
     }
-    if (myIngredients.value.grain) {
-      myIngredientsData.grain = myIngredients.value.grain.id
+    if (myIngredients.value.carb) {
+      myIngredientsData.carb = myIngredients.value.carb.id
     }
 
     await $fetch('/api/auth/onboarding', {
@@ -293,26 +358,37 @@ async function completeOnboarding() {
     await fetchUser()
     navigateTo('/')
   } catch (error: any) {
-    console.error('온보딩 오류:', error)
-    alert(error.data?.message || '오류가 발생했습니다')
+    console.error('Onboarding error:', error)
+    submitError.value = error.data?.message || 'Something went wrong. Please try again.'
   } finally {
     isSubmitting.value = false
   }
 }
 
-// 키보드 이벤트
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && step.value === 1) {
     nextStep()
   }
 }
 
+function handleClickOutside(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (!target.closest('.ingredient-dropdown')) {
+    closeAllDropdowns()
+  }
+}
+
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
+  document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  document.removeEventListener('click', handleClickOutside)
+  Object.values(searchTimeouts).forEach(timeout => {
+    if (timeout) clearTimeout(timeout)
+  })
 })
 </script>
 
@@ -332,20 +408,39 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- 메인 콘텐츠 -->
-    <div class="flex-1 flex items-center justify-center px-6 py-12">
-      <div class="w-full max-w-md">
-        <!-- Step 1: 닉네임 -->
-        <Transition
-          :name="direction === 'forward' ? 'slide-left' : 'slide-right'"
-          mode="out-in"
-        >
-          <div v-if="step === 1" key="step1" class="text-center">
-            <h1 class="text-2xl font-semibold text-gray-900 mb-2 animate-fade-in">
-              어떻게 불러드릴까요?
+    <!-- 메인 콘텐츠 - Swiper -->
+    <div class="flex-1 flex items-center py-12 overflow-hidden">
+      <Swiper
+        :modules="[EffectCreative]"
+        :slides-per-view="1"
+        :space-between="0"
+        :allow-touch-move="false"
+        :speed="500"
+        effect="creative"
+        :creative-effect="{
+          limitProgress: 2,
+          prev: {
+            translate: ['-100%', 0, 0],
+            opacity: 0,
+          },
+          next: {
+            translate: ['100%', 0, 0],
+            opacity: 0,
+          },
+        }"
+        :watch-slides-progress="true"
+        class="w-full"
+        @swiper="onSwiper"
+        @slide-change="onSlideChange"
+      >
+        <!-- Step 1: Nickname -->
+        <SwiperSlide>
+          <div class="text-center px-6 max-w-md mx-auto">
+            <h1 class="text-2xl font-semibold text-gray-900 mb-2">
+              {{ t('onboarding.step1Title') }}
             </h1>
-            <p class="text-gray-500 mb-8 animate-fade-in-delay">
-              다른 사용자에게 보여질 이름이에요
+            <p class="text-gray-500 mb-8">
+              {{ t('onboarding.step1Subtitle') }}
             </p>
 
             <div class="relative mb-6">
@@ -353,8 +448,8 @@ onUnmounted(() => {
                 <input
                   v-model="nickname"
                   type="text"
-                  placeholder="닉네임"
-                  maxlength="10"
+                  :placeholder="t('onboarding.step1Placeholder')"
+                  maxlength="30"
                   :class="[
                     'flex-1 text-center text-2xl font-medium py-4 border-b-2 outline-none transition-all bg-transparent',
                     nicknameError ? 'border-red-400' : 'border-gray-200 focus:border-gray-900'
@@ -370,7 +465,7 @@ onUnmounted(() => {
                       ? 'bg-gray-100 text-gray-400'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:scale-110 active:scale-95'
                   ]"
-                  title="랜덤 닉네임"
+                  :title="t('onboarding.randomNickname')"
                 >
                   <svg
                     :class="['w-6 h-6', isRolling && 'animate-spin-dice']"
@@ -388,51 +483,48 @@ onUnmounted(() => {
               </Transition>
             </div>
 
-            <p class="text-sm text-gray-400 mb-8">{{ nickname.length }}/10</p>
+            <p class="text-sm text-gray-400 mb-8">{{ nicknameLength }}/{{ maxNicknameLength }}</p>
 
             <button
               @click="nextStep"
-              :disabled="nickname.trim().length < 2"
+              :disabled="nicknameLength < 2 || nicknameLength > maxNicknameLength"
               :class="[
                 'w-full py-4 rounded-2xl font-semibold text-lg transition-all transform',
-                nickname.trim().length >= 2
+                nicknameLength >= 2 && nicknameLength <= maxNicknameLength
                   ? 'bg-gray-900 text-white hover:bg-gray-800 hover:scale-[1.02] active:scale-[0.98]'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               ]"
             >
-              다음
+              {{ t('common.next') }}
             </button>
           </div>
-        </Transition>
+        </SwiperSlide>
 
-        <!-- Step 2: 좋아하는 요리 -->
-        <Transition
-          :name="direction === 'forward' ? 'slide-left' : 'slide-right'"
-          mode="out-in"
-        >
-          <div v-if="step === 2" key="step2" class="text-center">
+        <!-- Step 2: Favorite dishes -->
+        <SwiperSlide>
+          <div class="text-center px-6 max-w-md mx-auto">
             <h1 class="text-2xl font-semibold text-gray-900 mb-2">
-              좋아하는 요리를 알려주세요
+              {{ t('onboarding.step2Title') }}
             </h1>
             <p class="text-gray-500 mb-8">
-              취향에 맞는 레시피를 추천해드릴게요
+              {{ t('onboarding.step2Subtitle') }}
             </p>
 
             <div class="flex flex-wrap justify-center gap-2 mb-8">
               <button
-                v-for="dish in dishOptions"
-                :key="dish"
-                @click="toggleDish(dish)"
+                v-for="dishKey in dishKeys"
+                :key="dishKey"
+                @click="toggleDish(dishKey)"
                 :class="[
                   'px-4 py-2.5 rounded-full text-sm font-medium transition-all transform',
-                  favoriteDishes.includes(dish)
+                  favoriteDishes.includes(dishKey)
                     ? 'bg-gray-900 text-white scale-105 shadow-lg'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105'
                 ]"
               >
-                {{ dish }}
+                {{ t(`onboarding.dishes.${dishKey}`) }}
                 <span
-                  v-if="favoriteDishes.includes(dish)"
+                  v-if="favoriteDishes.includes(dishKey)"
                   class="ml-1 inline-block animate-pop"
                 >
                   ✓
@@ -441,7 +533,7 @@ onUnmounted(() => {
             </div>
 
             <p class="text-sm text-gray-400 mb-6">
-              {{ favoriteDishes.length }}개 선택됨
+              {{ t('common.selected', { count: favoriteDishes.length }) }}
             </p>
 
             <div class="flex gap-3">
@@ -449,46 +541,69 @@ onUnmounted(() => {
                 @click="prevStep"
                 class="flex-1 py-4 rounded-2xl font-semibold text-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
               >
-                이전
+                {{ t('common.back') }}
               </button>
               <button
                 @click="nextStep"
                 class="flex-1 py-4 rounded-2xl font-semibold text-lg bg-gray-900 text-white hover:bg-gray-800 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
               >
-                다음
+                {{ t('common.next') }}
               </button>
             </div>
           </div>
-        </Transition>
+        </SwiperSlide>
 
-        <!-- Step 3: 싫어하는 재료 -->
-        <Transition
-          :name="direction === 'forward' ? 'slide-left' : 'slide-right'"
-          mode="out-in"
-        >
-          <div v-if="step === 3" key="step3" class="text-center">
+        <!-- Step 3: Disliked ingredients -->
+        <SwiperSlide>
+          <div class="text-center px-6 max-w-md mx-auto">
             <h1 class="text-2xl font-semibold text-gray-900 mb-2">
-              피하고 싶은 재료가 있나요?
+              {{ t('onboarding.step3Title') }}
             </h1>
-            <p class="text-gray-500 mb-8">
-              선택하지 않아도 괜찮아요
+            <p class="text-gray-500 mb-6">
+              {{ t('onboarding.step3Subtitle') }}
             </p>
+
+            <!-- Dietary preference toggles -->
+            <div class="flex justify-center gap-3 mb-6">
+              <button
+                @click="toggleVegetarian"
+                :class="[
+                  'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all',
+                  isVegetarian
+                    ? 'bg-green-500 text-white shadow-lg'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ]"
+              >
+                <span>🥬</span> {{ t('onboarding.vegetarian') }}
+              </button>
+              <button
+                @click="toggleVegan"
+                :class="[
+                  'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all',
+                  isVegan
+                    ? 'bg-green-600 text-white shadow-lg'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ]"
+              >
+                <span>🌱</span> {{ t('onboarding.vegan') }}
+              </button>
+            </div>
 
             <div class="flex flex-wrap justify-center gap-2 mb-8">
               <button
-                v-for="ingredient in ingredientOptions"
-                :key="ingredient"
-                @click="toggleIngredient(ingredient)"
+                v-for="ingredientKey in ingredientKeys"
+                :key="ingredientKey"
+                @click="toggleIngredient(ingredientKey)"
                 :class="[
                   'px-4 py-2.5 rounded-full text-sm font-medium transition-all transform',
-                  dislikedIngredients.includes(ingredient)
+                  dislikedIngredients.includes(ingredientKey)
                     ? 'bg-red-500 text-white scale-105 shadow-lg'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105'
                 ]"
               >
-                {{ ingredient }}
+                {{ t(`onboarding.dislikedIngredients.${ingredientKey}`) }}
                 <span
-                  v-if="dislikedIngredients.includes(ingredient)"
+                  v-if="dislikedIngredients.includes(ingredientKey)"
                   class="ml-1 inline-block animate-pop"
                 >
                   ✕
@@ -497,7 +612,7 @@ onUnmounted(() => {
             </div>
 
             <p class="text-sm text-gray-400 mb-6">
-              {{ dislikedIngredients.length }}개 선택됨
+              {{ t('common.selected', { count: dislikedIngredients.length }) }}
             </p>
 
             <div class="flex gap-3">
@@ -505,46 +620,42 @@ onUnmounted(() => {
                 @click="prevStep"
                 class="flex-1 py-4 rounded-2xl font-semibold text-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
               >
-                이전
+                {{ t('common.back') }}
               </button>
               <button
                 @click="nextStep"
                 class="flex-1 py-4 rounded-2xl font-semibold text-lg bg-gray-900 text-white hover:bg-gray-800 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
               >
-                다음
+                {{ t('common.next') }}
               </button>
             </div>
           </div>
-        </Transition>
+        </SwiperSlide>
 
-        <!-- Step 4: 내 재료 -->
-        <Transition
-          :name="direction === 'forward' ? 'slide-left' : 'slide-right'"
-          mode="out-in"
-        >
-          <div v-if="step === 4" key="step4" class="text-center" @click.self="closeAllDropdowns">
+        <!-- Step 4: My ingredients -->
+        <SwiperSlide>
+          <div class="text-center px-6 max-w-md mx-auto" @click.self="closeAllDropdowns">
             <h1 class="text-2xl font-semibold text-gray-900 mb-2">
-              내 냉장고에 뭐가 있나요?
+              {{ t('onboarding.step4Title') }}
             </h1>
             <p class="text-gray-500 mb-8">
-              간단히 선택해주세요 (선택)
+              {{ t('onboarding.step4Subtitle') }}
             </p>
 
             <div class="space-y-6 mb-8">
-              <!-- 주요 재료 -->
-              <div class="text-left">
+              <!-- Protein -->
+              <div class="text-left ingredient-dropdown">
                 <label class="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                  <span class="text-xl">🥩</span> 주요 재료
+                  <span class="text-xl">🥩</span> {{ t('onboarding.protein') }}
                 </label>
                 <div class="relative">
-                  <!-- 선택된 재료가 있을 때 -->
                   <div
-                    v-if="myIngredients.main"
+                    v-if="myIngredients.protein"
                     class="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl border border-gray-200"
                   >
-                    <span class="font-medium">{{ myIngredients.main.name }}</span>
+                    <span class="font-medium">{{ myIngredients.protein.name }}</span>
                     <button
-                      @click="clearIngredient('main')"
+                      @click="clearIngredient('protein')"
                       class="text-gray-400 hover:text-gray-600 p-1"
                     >
                       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -552,19 +663,18 @@ onUnmounted(() => {
                       </svg>
                     </button>
                   </div>
-                  <!-- 선택 UI -->
                   <div v-else>
                     <div class="relative">
                       <input
-                        v-model="searchQueries.main"
-                        @input="debouncedSearch('main')"
-                        @focus="dropdownOpen.main = true"
+                        v-model="searchQueries.protein"
+                        @input="debouncedSearch('protein')"
+                        @focus="dropdownOpen.protein = true"
                         type="text"
-                        placeholder="검색하거나 선택하세요"
+                        :placeholder="t('onboarding.searchOrSelect')"
                         class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-gray-400 transition-colors pr-10"
                       />
                       <button
-                        @click="toggleDropdown('main')"
+                        @click.stop="toggleDropdown('protein')"
                         class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
                       >
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -572,48 +682,42 @@ onUnmounted(() => {
                         </svg>
                       </button>
                     </div>
-                    <!-- 드롭다운 -->
                     <div
-                      v-if="dropdownOpen.main"
+                      v-if="dropdownOpen.protein"
                       class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto"
                     >
-                      <!-- 검색 결과 -->
-                      <template v-if="searchQueries.main && searchResults.main.length > 0">
+                      <template v-if="searchQueries.protein && searchResults.protein.length > 0">
                         <button
-                          v-for="item in searchResults.main"
+                          v-for="item in searchResults.protein"
                           :key="item.id"
-                          @click="selectIngredient('main', item)"
+                          @click="selectIngredient('protein', item)"
                           class="w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl last:rounded-b-xl"
                         >
                           {{ item.name }}
-                          <span class="text-xs text-gray-400 ml-1">{{ item.category }}</span>
                         </button>
                       </template>
-                      <!-- 기본 목록 -->
-                      <template v-else-if="!searchQueries.main">
+                      <template v-else-if="!searchQueries.protein">
                         <button
-                          v-for="item in mainIngredients"
+                          v-for="item in proteinIngredients.slice(0, 20)"
                           :key="item.id"
-                          @click="selectIngredient('main', item)"
+                          @click="selectIngredient('protein', item)"
                           class="w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl last:rounded-b-xl"
                         >
                           {{ item.name }}
-                          <span class="text-xs text-gray-400 ml-1">{{ item.category }}</span>
                         </button>
                       </template>
-                      <!-- 검색 결과 없음 -->
                       <template v-else>
-                        <div class="px-4 py-3 text-gray-400 text-sm">검색 결과가 없습니다</div>
+                        <div class="px-4 py-3 text-gray-400 text-sm">{{ t('onboarding.noResults') }}</div>
                       </template>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- 소스/양념 -->
-              <div class="text-left">
+              <!-- Sauce/Seasoning -->
+              <div class="text-left ingredient-dropdown">
                 <label class="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                  <span class="text-xl">🧂</span> 소스/양념
+                  <span class="text-xl">🧂</span> {{ t('onboarding.sauceSeasoning') }}
                 </label>
                 <div class="relative">
                   <div
@@ -637,11 +741,11 @@ onUnmounted(() => {
                         @input="debouncedSearch('sauce')"
                         @focus="dropdownOpen.sauce = true"
                         type="text"
-                        placeholder="검색하거나 선택하세요"
+                        :placeholder="t('onboarding.searchOrSelect')"
                         class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-gray-400 transition-colors pr-10"
                       />
                       <button
-                        @click="toggleDropdown('sauce')"
+                        @click.stop="toggleDropdown('sauce')"
                         class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
                       >
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -665,7 +769,7 @@ onUnmounted(() => {
                       </template>
                       <template v-else-if="!searchQueries.sauce">
                         <button
-                          v-for="item in sauceIngredients"
+                          v-for="item in sauceIngredients.slice(0, 20)"
                           :key="item.id"
                           @click="selectIngredient('sauce', item)"
                           class="w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl last:rounded-b-xl"
@@ -674,26 +778,26 @@ onUnmounted(() => {
                         </button>
                       </template>
                       <template v-else>
-                        <div class="px-4 py-3 text-gray-400 text-sm">검색 결과가 없습니다</div>
+                        <div class="px-4 py-3 text-gray-400 text-sm">{{ t('onboarding.noResults') }}</div>
                       </template>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- 곡물 -->
-              <div class="text-left">
+              <!-- Carbs -->
+              <div class="text-left ingredient-dropdown">
                 <label class="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                  <span class="text-xl">🍚</span> 곡물
+                  <span class="text-xl">🍚</span> {{ t('onboarding.grainsCarbs') }}
                 </label>
                 <div class="relative">
                   <div
-                    v-if="myIngredients.grain"
+                    v-if="myIngredients.carb"
                     class="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl border border-gray-200"
                   >
-                    <span class="font-medium">{{ myIngredients.grain.name }}</span>
+                    <span class="font-medium">{{ myIngredients.carb.name }}</span>
                     <button
-                      @click="clearIngredient('grain')"
+                      @click="clearIngredient('carb')"
                       class="text-gray-400 hover:text-gray-600 p-1"
                     >
                       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -704,15 +808,15 @@ onUnmounted(() => {
                   <div v-else>
                     <div class="relative">
                       <input
-                        v-model="searchQueries.grain"
-                        @input="debouncedSearch('grain')"
-                        @focus="dropdownOpen.grain = true"
+                        v-model="searchQueries.carb"
+                        @input="debouncedSearch('carb')"
+                        @focus="dropdownOpen.carb = true"
                         type="text"
-                        placeholder="검색하거나 선택하세요"
+                        :placeholder="t('onboarding.searchOrSelect')"
                         class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-gray-400 transition-colors pr-10"
                       />
                       <button
-                        @click="toggleDropdown('grain')"
+                        @click.stop="toggleDropdown('carb')"
                         class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
                       >
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -721,31 +825,31 @@ onUnmounted(() => {
                       </button>
                     </div>
                     <div
-                      v-if="dropdownOpen.grain"
+                      v-if="dropdownOpen.carb"
                       class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto"
                     >
-                      <template v-if="searchQueries.grain && searchResults.grain.length > 0">
+                      <template v-if="searchQueries.carb && searchResults.carb.length > 0">
                         <button
-                          v-for="item in searchResults.grain"
+                          v-for="item in searchResults.carb"
                           :key="item.id"
-                          @click="selectIngredient('grain', item)"
+                          @click="selectIngredient('carb', item)"
                           class="w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl last:rounded-b-xl"
                         >
                           {{ item.name }}
                         </button>
                       </template>
-                      <template v-else-if="!searchQueries.grain">
+                      <template v-else-if="!searchQueries.carb">
                         <button
-                          v-for="item in grainIngredients"
+                          v-for="item in carbIngredients.slice(0, 20)"
                           :key="item.id"
-                          @click="selectIngredient('grain', item)"
+                          @click="selectIngredient('carb', item)"
                           class="w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors first:rounded-t-xl last:rounded-b-xl"
                         >
                           {{ item.name }}
                         </button>
                       </template>
                       <template v-else>
-                        <div class="px-4 py-3 text-gray-400 text-sm">검색 결과가 없습니다</div>
+                        <div class="px-4 py-3 text-gray-400 text-sm">{{ t('onboarding.noResults') }}</div>
                       </template>
                     </div>
                   </div>
@@ -754,7 +858,7 @@ onUnmounted(() => {
             </div>
 
             <p class="text-sm text-gray-400 mb-6">
-              나중에 "내 재료" 페이지에서 더 추가할 수 있어요
+              {{ t('onboarding.addMoreLater') }}
             </p>
 
             <div class="flex gap-3">
@@ -762,7 +866,7 @@ onUnmounted(() => {
                 @click="prevStep"
                 class="flex-1 py-4 rounded-2xl font-semibold text-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
               >
-                이전
+                {{ t('common.back') }}
               </button>
               <button
                 @click="completeOnboarding"
@@ -774,49 +878,43 @@ onUnmounted(() => {
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
                   </svg>
-                  처리 중...
+                  {{ t('common.processing') }}
                 </span>
-                <span v-else>시작하기</span>
+                <span v-else>{{ t('onboarding.getStarted') }}</span>
               </button>
             </div>
+
+            <Transition name="fade">
+              <p v-if="submitError" class="mt-4 text-sm text-red-500 text-center">
+                {{ submitError }}
+              </p>
+            </Transition>
           </div>
-        </Transition>
-      </div>
+        </SwiperSlide>
+      </Swiper>
     </div>
 
-    <!-- 건너뛰기 (Step 2, 3, 4에서) -->
+    <!-- Skip (Step 2, 3, 4) -->
     <div v-if="step > 1" class="pb-8 text-center">
       <button
-        @click="isLastStep() ? completeOnboarding() : nextStep()"
+        @click="completeOnboarding"
         class="text-gray-400 text-sm hover:text-gray-600 transition-colors"
       >
-        건너뛰기
+        {{ t('onboarding.skipForNow') }}
       </button>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* 페이지 전환 애니메이션 - 슬라이드만 */
-.slide-left-enter-active,
-.slide-left-leave-active,
-.slide-right-enter-active,
-.slide-right-leave-active {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+/* Swiper 슬라이드 페이드 효과 */
+:deep(.swiper-slide) {
+  transition: opacity 0.5s ease;
+  opacity: 0;
 }
 
-.slide-left-enter-from {
-  transform: translateX(100%);
-}
-.slide-left-leave-to {
-  transform: translateX(-100%);
-}
-
-.slide-right-enter-from {
-  transform: translateX(-100%);
-}
-.slide-right-leave-to {
-  transform: translateX(100%);
+:deep(.swiper-slide-active) {
+  opacity: 1;
 }
 
 /* 페이드 애니메이션 */
@@ -827,25 +925,6 @@ onUnmounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-/* 텍스트 페이드인 */
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-out;
-}
-.animate-fade-in-delay {
-  animation: fadeIn 0.5s ease-out 0.1s both;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* 선택 팝 애니메이션 */

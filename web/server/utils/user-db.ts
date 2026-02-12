@@ -131,7 +131,7 @@ function initUserTables(db: Database.Database) {
 // 타입 정의
 export interface User {
   id: number
-  provider: 'kakao' | 'naver'
+  provider: 'google'
   provider_id: string
   email: string | null
   nickname: string | null
@@ -196,7 +196,7 @@ export interface UserRecipeStep {
 
 // 사용자 조회/생성
 export function findOrCreateUser(
-  provider: 'kakao' | 'naver',
+  provider: 'google',
   providerId: string
 ): { user: User; isNew: boolean } {
   const db = useUserDB()
@@ -243,9 +243,9 @@ export function completeOnboarding(
   favoriteDishes: string[],
   dislikedIngredients: string[],
   myIngredients?: {
-    main?: number
+    protein?: number
     sauce?: number
-    grain?: number
+    carb?: number
   }
 ) {
   const db = useUserDB()
@@ -280,14 +280,14 @@ export function completeOnboarding(
       VALUES (?, ?)
     `)
 
-    if (myIngredients.main) {
-      insertIngredient.run(userId, myIngredients.main)
+    if (myIngredients.protein) {
+      insertIngredient.run(userId, myIngredients.protein)
     }
     if (myIngredients.sauce) {
       insertIngredient.run(userId, myIngredients.sauce)
     }
-    if (myIngredients.grain) {
-      insertIngredient.run(userId, myIngredients.grain)
+    if (myIngredients.carb) {
+      insertIngredient.run(userId, myIngredients.carb)
     }
   }
 

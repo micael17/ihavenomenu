@@ -1,14 +1,15 @@
-interface NaverTokenResponse {
+interface GoogleTokenResponse {
   access_token: string
-  refresh_token: string
   token_type: string
   expires_in: number
+  id_token: string
 }
 
-interface NaverUserResponse {
-  response: {
-    id: string
-  }
+interface GoogleUserResponse {
+  sub: string  // Google의 고유 사용자 ID
+  email?: string
+  name?: string
+  picture?: string
 }
 
 export default defineEventHandler(async (event) => {
@@ -24,26 +25,31 @@ export default defineEventHandler(async (event) => {
   }
 
   // 1. 토큰 교환
-  const tokenUrl = new URL('https://nid.naver.com/oauth2.0/token')
-  tokenUrl.searchParams.set('grant_type', 'authorization_code')
-  tokenUrl.searchParams.set('client_id', config.naverClientId)
-  tokenUrl.searchParams.set('client_secret', config.naverClientSecret)
-  tokenUrl.searchParams.set('code', code)
-  tokenUrl.searchParams.set('state', query.state as string || '')
+  const tokenResponse = await $fetch<GoogleTokenResponse>('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: config.googleClientId,
+      client_secret: config.googleClientSecret,
+      redirect_uri: config.googleRedirectUri,
+      code
+    }).toString()
+  })
 
-  const tokenResponse = await $fetch<NaverTokenResponse>(tokenUrl.toString())
-
-  // 2. 사용자 정보 조회 (ID만 필요)
-  const userResponse = await $fetch<NaverUserResponse>('https://openapi.naver.com/v1/nid/me', {
+  // 2. 사용자 정보 조회
+  const userResponse = await $fetch<GoogleUserResponse>('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: {
       Authorization: `Bearer ${tokenResponse.access_token}`
     }
   })
 
-  const providerId = userResponse.response.id
+  const providerId = userResponse.sub
 
   // 3. 사용자 생성 또는 조회
-  const { user, isNew } = findOrCreateUser('naver', providerId)
+  const { user, isNew } = findOrCreateUser('google', providerId)
 
   // 4. JWT 토큰 생성 및 쿠키 설정
   const token = createToken(user.id)
