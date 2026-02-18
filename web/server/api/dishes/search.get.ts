@@ -142,6 +142,7 @@ export default defineEventHandler(async (event) => {
 
       dbDishesWithFlag = dbDishes.map(dish => ({
         ...dish,
+        ingredients: dish.ingredients ? dish.ingredients.replace(/[\x00-\x1F\x7F]/g, ' ').trim() : '',
         isUserRecipe: false
       }))
     }

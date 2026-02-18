@@ -79,6 +79,10 @@ export default defineEventHandler(async (event) => {
       seen.add(ing.id)
       return true
     })
+    .map((ing: any) => ({
+      ...ing,
+      amount: ing.amount ? ing.amount.replace(/[\x00-\x1F\x7F]/g, ' ').trim() : null
+    }))
     .sort((a: any, b: any) => {
       // 카테고리 순, 이름 순 정렬
       if (a.category !== b.category) {

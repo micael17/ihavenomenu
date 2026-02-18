@@ -196,6 +196,8 @@
     "moreOnYoutube": "YouTube에서 더 보기",
     "searchOnYoutube": "레시피 검색",
     "watchOnYoutube": "YouTube에서 영상 레시피 보기",
+    "loginForVideos": "로그인하시면 재료에 맞는 유튜브 레시피 영상을 바로 찾아드려요.",
+    "goToLogin": "로그인하러 가기",
     "loadError": "요리 정보를 불러올 수 없습니다",
     "goBack": "돌아가기"
   },

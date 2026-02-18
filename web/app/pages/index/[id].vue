@@ -50,6 +50,7 @@ interface YouTubeVideo {
 const route = useRoute()
 const { t, locale } = useI18n()
 const { selectedIngredients } = useRecipeSearch()
+const { isLoggedIn } = useAuth()
 
 const dishDetail = ref<DishDetail | null>(null)
 const youtubeVideos = ref<YouTubeVideo[]>([])
@@ -73,7 +74,9 @@ async function loadDishDetail() {
       .slice(0, 3)
       .map(ing => ing.name)
 
-    fetchYoutubeVideos(dishDetail.value.dish.name, mainIngredients)
+    if (isLoggedIn.value) {
+      fetchYoutubeVideos(dishDetail.value.dish.name, mainIngredients)
+    }
   } catch (error) {
     console.error('상세 조회 오류:', error)
   } finally {
@@ -235,7 +238,18 @@ watch(() => route.params.id, () => {
       <section class="bg-white border border-gray-200 rounded-lg p-6">
         <h2 class="font-semibold text-gray-900 mb-4">{{ t('dishDetail.recipeVideos') }}</h2>
 
-        <div v-if="isLoadingYoutube" class="text-center py-4 text-gray-500">
+        <!-- 비로그인 시 로그인 유도 -->
+        <div v-if="!isLoggedIn" class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <p class="text-sm text-orange-800">{{ t('dishDetail.loginForVideos') }}</p>
+          <NuxtLink
+            to="/login"
+            class="inline-block mt-2 text-sm font-medium text-orange-600 hover:text-orange-700"
+          >
+            {{ t('dishDetail.goToLogin') }} →
+          </NuxtLink>
+        </div>
+
+        <div v-else-if="isLoadingYoutube" class="text-center py-4 text-gray-500">
           {{ t('dishDetail.searchingVideos') }}
         </div>
 

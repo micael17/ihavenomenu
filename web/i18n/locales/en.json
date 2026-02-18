@@ -196,6 +196,8 @@
     "moreOnYoutube": "See more on YouTube",
     "searchOnYoutube": "Search recipes",
     "watchOnYoutube": "Watch recipe videos on YouTube",
+    "loginForVideos": "Log in to find YouTube recipe videos matched to your ingredients.",
+    "goToLogin": "Go to login",
     "loadError": "Failed to load dish information",
     "goBack": "Go back"
   },
