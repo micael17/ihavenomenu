@@ -62,11 +62,19 @@ jobs:
 
       - name: 🔐 SSH로 Lightsail 배포
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          NUXT_DB_PATH: /var/www/ihavenomenu/database/ihavenomenu.db
+          NUXT_JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          NUXT_YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          NUXT_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          NUXT_GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          NUXT_GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ${{ secrets.LIGHTSAIL_USERNAME }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           port: 22
+          envs: NUXT_DB_PATH,NUXT_JWT_SECRET,NUXT_YOUTUBE_API_KEY,NUXT_GOOGLE_CLIENT_ID,NUXT_GOOGLE_CLIENT_SECRET,NUXT_GOOGLE_REDIRECT_URI
           script: |
             echo "🔧 PM2 설치 확인..."
             if ! command -v pm2 &> /dev/null; then
@@ -74,6 +82,20 @@ jobs:
             fi
 
             APP_DIR=/var/www/ihavenomenu
+
+            echo "📝 환경변수 파일 생성..."
+            cat > $APP_DIR/.env << ENVEOF
+            NITRO_PORT=8031
+            NODE_ENV=production
+            NUXT_DB_PATH=${NUXT_DB_PATH}
+            NUXT_JWT_SECRET=${NUXT_JWT_SECRET}
+            NUXT_YOUTUBE_API_KEY=${NUXT_YOUTUBE_API_KEY}
+            NUXT_GOOGLE_CLIENT_ID=${NUXT_GOOGLE_CLIENT_ID}
+            NUXT_GOOGLE_CLIENT_SECRET=${NUXT_GOOGLE_CLIENT_SECRET}
+            NUXT_GOOGLE_REDIRECT_URI=${NUXT_GOOGLE_REDIRECT_URI}
+            ENVEOF
+            sed -i 's/^[[:space:]]*//' $APP_DIR/.env
+            chmod 600 $APP_DIR/.env
 
             echo "📂 빌드 결과물 이동..."
             sudo cp -r ~/ihavenomenu-tmp/web/.output $APP_DIR/.output-new
@@ -98,15 +120,10 @@ jobs:
               rm -rf database-new
             fi
 
-            echo "📝 환경변수 파일 확인..."
-            if [ ! -f .env ]; then
-              echo "⚠️  .env 파일이 없습니다. 서버에 직접 생성해주세요."
-              exit 1
-            fi
-
             echo "🔄 앱 재시작..."
             sudo chown -R ubuntu:ubuntu $APP_DIR/.output
-            pm2 restart ihavenomenu || pm2 start ecosystem.config.cjs
+            pm2 delete ihavenomenu 2>/dev/null || true
+            cd $APP_DIR && pm2 start ecosystem.config.cjs
 
             echo "🧹 정리..."
             rm -rf ~/ihavenomenu-tmp
