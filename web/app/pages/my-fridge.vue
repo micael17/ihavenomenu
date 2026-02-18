@@ -344,16 +344,16 @@ watch(locale, () => {
             <!-- 재료 선택 -->
             <div v-else class="p-4">
               <!-- 카테고리 탭 -->
-              <div class="flex flex-wrap gap-2 mb-4">
+              <div class="flex flex-wrap gap-2">
                 <button
                   v-for="category in categories"
                   :key="category"
                   @click="activeCategory = category"
                   :class="[
-                    'px-3 py-1.5 text-sm rounded-lg transition-colors',
+                    'px-3 py-1.5 text-sm font-medium rounded-full border transition-colors',
                     activeCategory === category
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400 hover:text-gray-800'
                   ]"
                 >
                   {{ category }}
@@ -361,22 +361,24 @@ watch(locale, () => {
               </div>
 
               <!-- 재료 목록 -->
-              <div v-if="activeCategory" class="flex flex-wrap gap-2">
-                <button
-                  v-for="ing in groupedIngredients[activeCategory]"
-                  :key="ing.id"
-                  @click="selectIngredientToAdd(ing)"
-                  :disabled="isAlreadyAdded(ing.id)"
-                  :class="[
-                    'px-3 py-1.5 text-sm rounded-lg transition-colors',
-                    isAlreadyAdded(ing.id)
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  ]"
-                >
-                  {{ ing.name }}
-                  <span v-if="isAlreadyAdded(ing.id)" class="ml-1 text-xs">✓</span>
-                </button>
+              <div v-if="activeCategory" class="mt-4 pt-4 border-t border-gray-200">
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="ing in groupedIngredients[activeCategory]"
+                    :key="ing.id"
+                    @click="selectIngredientToAdd(ing)"
+                    :disabled="isAlreadyAdded(ing.id)"
+                    :class="[
+                      'px-3 py-1.5 text-sm rounded-lg transition-colors',
+                      isAlreadyAdded(ing.id)
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ]"
+                  >
+                    {{ ing.name }}
+                    <span v-if="isAlreadyAdded(ing.id)" class="ml-1 text-xs">✓</span>
+                  </button>
+                </div>
               </div>
               <p v-else class="text-sm text-gray-400 text-center py-4">
                 {{ t('myFridge.selectCategory') }}

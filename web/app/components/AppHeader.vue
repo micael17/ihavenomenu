@@ -1,9 +1,13 @@
 <script setup lang="ts">
-const { t } = useI18n()
+const { t, locale, setLocale } = useI18n()
 const route = useRoute()
 const { user, isLoggedIn, logout } = useAuth()
 
 const showUserMenu = ref(false)
+
+function toggleLocale() {
+  setLocale(locale.value === 'ko' ? 'en' : 'ko')
+}
 
 function isActive(path: string) {
   if (path === '/') {
@@ -47,6 +51,15 @@ function handleLogin() {
             </NuxtLink>
           </nav>
         </div>
+
+        <div class="flex items-center gap-3">
+        <!-- 언어 토글 -->
+        <button
+          @click="toggleLocale"
+          class="px-2.5 py-1 text-xs font-medium rounded-full border border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+        >
+          {{ locale === 'ko' ? 'EN' : '한국어' }}
+        </button>
 
         <!-- 로그인 상태 -->
         <div v-if="isLoggedIn" class="relative">
@@ -102,6 +115,7 @@ function handleLogin() {
         >
           {{ t('common.login') }}
         </button>
+        </div>
       </div>
     </div>
   </header>
