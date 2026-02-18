@@ -42,6 +42,24 @@ const showAddModal = ref(false)
 const activeCategory = ref<string | null>(null)
 const selectedIngredientToAdd = ref<BaseIngredient | null>(null)
 const expiryDateInput = ref('')
+const searchQuery = ref('')
+
+// 검색 필터링된 재료
+const filteredIngredients = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) {
+    // 검색어 없으면 카테고리 기반
+    if (!activeCategory.value) {
+      // "전체" 선택 시 모든 재료
+      return Object.values(groupedIngredients.value).flat()
+    }
+    return groupedIngredients.value[activeCategory.value] || []
+  }
+  // 검색어 있으면 전체에서 필터링
+  return Object.values(groupedIngredients.value)
+    .flat()
+    .filter((ing: BaseIngredient) => ing.name.toLowerCase().includes(query))
+})
 
 // 사용자 재료 로드
 async function loadUserIngredients() {
@@ -93,7 +111,8 @@ async function removeIngredient(ingredientId: number) {
 // 모달 관련
 function openAddModal() {
   showAddModal.value = true
-  activeCategory.value = categories.value[0] || null
+  activeCategory.value = null
+  searchQuery.value = ''
 }
 
 function closeAddModal() {
@@ -101,6 +120,7 @@ function closeAddModal() {
   selectedIngredientToAdd.value = null
   expiryDateInput.value = ''
   activeCategory.value = null
+  searchQuery.value = ''
 }
 
 function selectIngredientToAdd(ing: BaseIngredient) {
@@ -302,7 +322,7 @@ watch(locale, () => {
         class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
         @click.self="closeAddModal"
       >
-        <div class="bg-white w-full max-w-lg rounded-lg max-h-[80vh] overflow-hidden flex flex-col">
+        <div class="bg-white w-full max-w-lg rounded-lg h-[70vh] overflow-hidden flex flex-col">
           <!-- 헤더 -->
           <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
             <h2 class="font-semibold text-lg text-gray-900">{{ t('myFridge.addIngredientModal') }}</h2>
@@ -311,10 +331,9 @@ watch(locale, () => {
             </button>
           </div>
 
-          <!-- 본문 -->
-          <div class="flex-1 overflow-y-auto">
-            <!-- 선택된 재료 표시 -->
-            <div v-if="selectedIngredientToAdd" class="p-4 bg-gray-50 border-b border-gray-100">
+          <!-- 선택된 재료 표시 -->
+          <template v-if="selectedIngredientToAdd">
+            <div class="p-4 bg-gray-50 border-b border-gray-100 flex-shrink-0">
               <div class="flex items-center justify-between">
                 <div>
                   <p class="font-medium text-gray-900">{{ selectedIngredientToAdd.name }}</p>
@@ -327,8 +346,6 @@ watch(locale, () => {
                   {{ t('myFridge.changeIngredient') }}
                 </button>
               </div>
-
-              <!-- 유통기한 입력 (선택) -->
               <div class="mt-4">
                 <label class="block text-sm text-gray-600 mb-2">
                   {{ t('myFridge.expiryDateLabel') }} <span class="text-gray-400">{{ t('myFridge.expiryDateOptional') }}</span>
@@ -340,61 +357,85 @@ watch(locale, () => {
                 />
               </div>
             </div>
+            <div class="p-4 border-t border-gray-100 flex-shrink-0 mt-auto">
+              <button
+                @click="addIngredient"
+                class="w-full py-3 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800"
+              >
+                {{ t('myFridge.addButton') }}
+              </button>
+            </div>
+          </template>
 
-            <!-- 재료 선택 -->
-            <div v-else class="p-4">
-              <!-- 카테고리 탭 -->
-              <div class="flex flex-wrap gap-2">
+          <!-- 재료 선택 -->
+          <template v-else>
+            <!-- 검색 입력 -->
+            <div class="px-4 pt-3 pb-2 flex-shrink-0">
+              <input
+                v-model="searchQuery"
+                type="text"
+                :placeholder="t('myFridge.searchPlaceholder')"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              />
+            </div>
+
+            <!-- 카테고리 탭 (검색 중이 아닐 때만) -->
+            <div v-if="!searchQuery.trim()" class="px-4 pb-2 flex-shrink-0">
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  @click="activeCategory = null"
+                  :class="[
+                    'px-3 py-1 text-xs font-medium rounded-full border transition-colors',
+                    activeCategory === null
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                  ]"
+                >
+                  {{ t('myFridge.allIngredients') }}
+                </button>
                 <button
                   v-for="category in categories"
                   :key="category"
                   @click="activeCategory = category"
                   :class="[
-                    'px-3 py-1.5 text-sm font-medium rounded-full border transition-colors',
+                    'px-3 py-1 text-xs font-medium rounded-full border transition-colors',
                     activeCategory === category
                       ? 'bg-gray-900 text-white border-gray-900'
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400 hover:text-gray-800'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
                   ]"
                 >
                   {{ category }}
                 </button>
               </div>
+            </div>
 
-              <!-- 재료 목록 -->
-              <div v-if="activeCategory" class="mt-4 pt-4 border-t border-gray-200">
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    v-for="ing in groupedIngredients[activeCategory]"
-                    :key="ing.id"
-                    @click="selectIngredientToAdd(ing)"
-                    :disabled="isAlreadyAdded(ing.id)"
-                    :class="[
-                      'px-3 py-1.5 text-sm rounded-lg transition-colors',
-                      isAlreadyAdded(ing.id)
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    ]"
-                  >
-                    {{ ing.name }}
-                    <span v-if="isAlreadyAdded(ing.id)" class="ml-1 text-xs">✓</span>
-                  </button>
-                </div>
+            <!-- 재료 목록 (고정 높이 스크롤) -->
+            <div class="flex-1 overflow-y-auto border-t border-gray-100 px-4 py-3">
+              <p v-if="searchQuery.trim()" class="text-xs text-gray-400 mb-2">
+                {{ t('myFridge.searchResultCount', { count: filteredIngredients.length }) }}
+              </p>
+              <div v-if="filteredIngredients.length > 0" class="flex flex-wrap gap-2">
+                <button
+                  v-for="ing in filteredIngredients"
+                  :key="ing.id"
+                  @click="selectIngredientToAdd(ing)"
+                  :disabled="isAlreadyAdded(ing.id)"
+                  :class="[
+                    'px-3 py-1.5 text-sm rounded-lg transition-colors',
+                    isAlreadyAdded(ing.id)
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ]"
+                >
+                  {{ ing.name }}
+                  <span v-if="isAlreadyAdded(ing.id)" class="ml-1 text-xs">✓</span>
+                </button>
               </div>
-              <p v-else class="text-sm text-gray-400 text-center py-4">
-                {{ t('myFridge.selectCategory') }}
+              <p v-else class="text-sm text-gray-400 text-center py-8">
+                {{ t('myFridge.noSearchResults') }}
               </p>
             </div>
-          </div>
-
-          <!-- 푸터 -->
-          <div v-if="selectedIngredientToAdd" class="p-4 border-t border-gray-100 flex-shrink-0">
-            <button
-              @click="addIngredient"
-              class="w-full py-3 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800"
-            >
-              {{ t('myFridge.addButton') }}
-            </button>
-          </div>
+          </template>
         </div>
       </div>
     </Teleport>
