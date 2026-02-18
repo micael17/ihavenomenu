@@ -1,12 +1,18 @@
 import { useDB, type DishWithIngredients } from '../../utils/db'
+import { getLocale } from '../../utils/locale'
 
 const PAGE_SIZE = 12
+const MAX_LIMIT = 50
 
 export default defineEventHandler(async (event) => {
+  checkRateLimit(event, { maxRequests: 30, windowMs: 60000 })
+
   const query = getQuery(event)
   const ingredientNames = (query.ingredients as string || '').split(',').filter(Boolean)
-  const offset = parseInt(query.offset as string) || 0
-  const limit = parseInt(query.limit as string) || PAGE_SIZE
+  const offset = Math.max(0, parseInt(query.offset as string) || 0)
+  const limit = Math.min(Math.max(1, parseInt(query.limit as string) || PAGE_SIZE), MAX_LIMIT)
+  const cuisine = (query.cuisine as string) || 'mixed'
+  const locale = getLocale(event)
 
   if (ingredientNames.length === 0) {
     return { dishes: [], total: 0, hasMore: false }
@@ -15,15 +21,16 @@ export default defineEventHandler(async (event) => {
   try {
     const db = useDB()
 
-    // 1. 입력된 재료명으로 기본 재료 ID 찾기
+    // 1. 입력된 재료명으로 기본 재료 ID 찾기 (name + aliases 양쪽 체크)
     const ingredientPlaceholders = ingredientNames.map(() => '?').join(',')
+    const aliasConditions = ingredientNames.map(() => `json_extract(aliases, '$[0]') = ? COLLATE NOCASE`).join(' OR ')
 
     const baseIngredientSQL = `
       SELECT id FROM ingredients
-      WHERE is_base = 1 AND name IN (${ingredientPlaceholders})
+      WHERE is_base = 1 AND (name IN (${ingredientPlaceholders}) OR ${aliasConditions})
     `
     const baseIds = db.prepare(baseIngredientSQL)
-      .all(...ingredientNames)
+      .all(...ingredientNames, ...ingredientNames)
       .map((row: any) => row.id)
 
     if (baseIds.length === 0) {
@@ -95,14 +102,26 @@ export default defineEventHandler(async (event) => {
     let dbDishesWithFlag: any[] = []
 
     if (dbLimit > 0) {
+      // korean: 한글 카테고리(한식) 우선, mixed: 매칭도만 기준
+      const cuisineOrder = cuisine === 'korean'
+        ? `CASE WHEN d.category GLOB '*[가-힣]*' THEN 0 ELSE 1 END ASC,`
+        : ''
+
+      const dishNameField = locale === 'en'
+        ? `COALESCE(d.name_en, d.name) as name`
+        : `d.name`
+      const ingredientNameField = locale === 'en'
+        ? `COALESCE(json_extract(i.aliases, '$[0]'), i.name)`
+        : `i.name`
+
       const searchSQL = `
         SELECT
           d.id,
-          d.name,
+          ${dishNameField},
           d.category,
           d.image_url,
           d.description,
-          GROUP_CONCAT(DISTINCT i.name) as ingredients,
+          GROUP_CONCAT(DISTINCT ${ingredientNameField}) as ingredients,
           COUNT(DISTINCT CASE WHEN di.ingredient_id IN (${idPlaceholders}) THEN di.ingredient_id END) as match_count,
           COUNT(DISTINCT di.ingredient_id) as total_count
         FROM dishes d
@@ -114,7 +133,7 @@ export default defineEventHandler(async (event) => {
           WHERE ingredient_id IN (${idPlaceholders})
         )
         GROUP BY d.id
-        ORDER BY match_count DESC, total_count ASC
+        ORDER BY ${cuisineOrder} match_count DESC, total_count ASC
         LIMIT ? OFFSET ?
       `
 
@@ -145,7 +164,7 @@ export default defineEventHandler(async (event) => {
     console.error('Search error:', error)
     throw createError({
       statusCode: 500,
-      message: error instanceof Error ? error.message : 'Search failed'
+      message: 'Search failed'
     })
   }
 })

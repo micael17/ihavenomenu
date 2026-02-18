@@ -26,6 +26,8 @@ definePageMeta({
   middleware: 'auth'
 })
 
+const { t } = useI18n()
+
 const { data, refresh } = await useFetch<{ recipes: Recipe[]; creator: Creator | null }>('/api/recipes/my')
 
 const recipes = computed(() => data.value?.recipes || [])
@@ -45,27 +47,27 @@ if (!creator.value) {
       <!-- 헤더 -->
       <div class="flex items-center justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-semibold text-gray-900">내 레시피</h1>
-          <p class="text-gray-500 mt-1">{{ recipes.length }}개의 레시피</p>
+          <h1 class="text-2xl font-semibold text-gray-900">{{ t('creator.myRecipes') }}</h1>
+          <p class="text-gray-500 mt-1">{{ t('creator.recipesCount', { count: recipes.length }) }}</p>
         </div>
         <NuxtLink
           to="/creator/recipes/new"
           class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800"
         >
-          + 새 레시피
+          {{ t('creator.newRecipe') }}
         </NuxtLink>
       </div>
 
       <!-- 빈 상태 -->
       <div v-if="recipes.length === 0" class="bg-white rounded-2xl p-8 text-center shadow-sm">
         <span class="text-5xl">📝</span>
-        <h2 class="text-lg font-medium text-gray-900 mt-4">아직 작성한 레시피가 없어요</h2>
-        <p class="text-gray-500 mt-2 text-sm">첫 번째 레시피를 작성해보세요!</p>
+        <h2 class="text-lg font-medium text-gray-900 mt-4">{{ t('creator.noRecipesYet') }}</h2>
+        <p class="text-gray-500 mt-2 text-sm">{{ t('creator.writeFirstRecipe') }}</p>
         <NuxtLink
           to="/creator/recipes/new"
           class="inline-block mt-4 px-6 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800"
         >
-          레시피 작성하기
+          {{ t('creator.writeRecipe') }}
         </NuxtLink>
       </div>
 
@@ -94,7 +96,7 @@ if (!creator.value) {
             <h3 class="font-medium text-gray-900">{{ recipe.title }}</h3>
             <div class="flex items-center gap-2 text-sm text-gray-500 mt-1">
               <span v-if="recipe.category">{{ recipe.category }}</span>
-              <span v-if="recipe.cooking_time">• {{ recipe.cooking_time }}분</span>
+              <span v-if="recipe.cooking_time">• {{ recipe.cooking_time }}{{ t('common.minutes') }}</span>
             </div>
             <div class="flex items-center gap-4 mt-2 text-sm text-gray-400">
               <span>👁️ {{ recipe.view_count }}</span>
@@ -109,7 +111,7 @@ if (!creator.value) {
                     : 'bg-gray-100 text-gray-600'
                 ]"
               >
-                {{ recipe.status === 'published' ? '게시됨' : '임시저장' }}
+                {{ recipe.status === 'published' ? t('common.published') : t('common.draft') }}
               </span>
             </div>
           </div>
@@ -117,10 +119,10 @@ if (!creator.value) {
           <!-- 액션 -->
           <div class="flex flex-col gap-2">
             <NuxtLink
-              :to="`/${recipe.id}`"
+              :to="`/recipe/${recipe.id}`"
               class="text-sm text-gray-500 hover:text-gray-900"
             >
-              보기
+              {{ t('common.view') }}
             </NuxtLink>
           </div>
         </div>

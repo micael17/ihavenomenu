@@ -6,10 +6,11 @@ import 'swiper/css'
 import 'swiper/css/effect-creative'
 
 definePageMeta({
-  layout: false
+  layout: false,
+  middleware: 'auth'
 })
 
-const { t, tm } = useI18n()
+const { t, tm, locale } = useI18n()
 const { user, fetchUser } = useAuth()
 
 // 온보딩 완료된 사용자는 홈으로
@@ -162,12 +163,14 @@ const categoryGroups = {
 }
 
 const { data: baseIngredients } = await useFetch('/api/ingredients/base', {
-  query: { orderByPopularity: 'true' }
+  query: { orderByPopularity: 'true' },
+  watch: [locale]
 })
 
 // Fetch top-level proteins only (parent_id IS NULL)
 const { data: proteinData } = await useFetch('/api/ingredients/base', {
-  query: { topLevelOnly: 'true' }
+  query: { topLevelOnly: 'true' },
+  watch: [locale]
 })
 
 // Top-level proteins only (Beef, Chicken, Pork - not Ground Beef, Chicken Breast, etc.)
@@ -326,6 +329,11 @@ function toggleIngredient(ingredientKey: string) {
 }
 
 async function completeOnboarding() {
+  if (nicknameLength.value < 2) {
+    submitError.value = t('onboarding.nicknameMinError')
+    swiperRef.value?.slideTo(0)
+    return
+  }
   isSubmitting.value = true
   submitError.value = ''
 

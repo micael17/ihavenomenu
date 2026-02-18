@@ -3,6 +3,8 @@ definePageMeta({
   middleware: 'auth'
 })
 
+const { t } = useI18n()
+
 interface SelectedIngredient {
   ingredient_id?: number
   custom_name?: string
@@ -128,7 +130,7 @@ function removeStep(index: number) {
 function nextStep() {
   if (step.value === 1) {
     if (!title.value.trim()) {
-      error.value = '요리 이름을 입력해주세요'
+      error.value = t('creator.recipeNameRequired')
       return
     }
     error.value = ''
@@ -173,19 +175,15 @@ async function saveRecipe() {
 
     navigateTo(`/creator/recipes`)
   } catch (e: any) {
-    error.value = e.data?.message || '저장에 실패했습니다'
+    error.value = e.data?.message || t('creator.saveFailed')
   } finally {
     isLoading.value = false
   }
 }
 
 // 카테고리 옵션
-const categoryOptions = ['한식', '중식', '일식', '양식', '분식', '디저트', '음료', '기타']
-const difficultyOptions = [
-  { value: 'easy', label: '쉬움' },
-  { value: 'medium', label: '보통' },
-  { value: 'hard', label: '어려움' }
-]
+const categoryKeys = ['korean', 'chinese', 'japanese', 'western', 'snack', 'dessert', 'beverage', 'other']
+const difficultyKeys = ['easy', 'medium', 'hard']
 const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
 </script>
 
@@ -198,10 +196,10 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
       <div class="mb-6">
         <div class="flex items-center justify-between text-sm text-gray-500 mb-2">
           <span>{{ step }} / {{ totalSteps }}</span>
-          <span v-if="step === 1">기본 정보</span>
-          <span v-else-if="step === 2">재료</span>
-          <span v-else-if="step === 3">조리법</span>
-          <span v-else>완료</span>
+          <span v-if="step === 1">{{ t('creator.basicInfo') }}</span>
+          <span v-else-if="step === 2">{{ t('creator.ingredients') }}</span>
+          <span v-else-if="step === 3">{{ t('creator.cookingSteps') }}</span>
+          <span v-else>{{ t('creator.preview') }}</span>
         </div>
         <div class="h-1 bg-gray-200 rounded-full">
           <div
@@ -213,24 +211,24 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
 
       <!-- Step 1: 기본 정보 -->
       <div v-if="step === 1" class="bg-white rounded-2xl p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">기본 정보</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('creator.basicInfo') }}</h2>
 
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">
-              요리 이름 <span class="text-red-500">*</span>
+              {{ t('creator.recipeName') }} <span class="text-red-500">*</span>
             </label>
             <input
               v-model="title"
               type="text"
-              placeholder="예: 김치볶음밥"
+              :placeholder="t('creator.recipeNamePlaceholder')"
               class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
             />
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">
-              📺 YouTube 영상 (선택)
+              📺 {{ t('creator.youtubeVideo') }}
             </label>
             <input
               v-model="youtubeUrl"
@@ -241,39 +239,39 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
             />
             <div v-if="youtubeThumbnail" class="mt-2 rounded-lg overflow-hidden">
               <img :src="youtubeThumbnail" class="w-full aspect-video object-cover" />
-              <p class="text-sm text-green-600 mt-1">✅ 영상이 연결되었습니다</p>
+              <p class="text-sm text-green-600 mt-1">{{ t('creator.videoLinked') }}</p>
             </div>
           </div>
 
           <div class="grid grid-cols-3 gap-3">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">카테고리</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('creator.categoryLabel') }}</label>
               <select
                 v-model="category"
                 class="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
               >
-                <option value="">선택</option>
-                <option v-for="opt in categoryOptions" :key="opt" :value="opt">{{ opt }}</option>
+                <option value="">{{ t('creator.selectOption') }}</option>
+                <option v-for="key in categoryKeys" :key="key" :value="key">{{ t(`creator.categories.${key}`) }}</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">⏱️ 시간</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">⏱️ {{ t('creator.timeLabel') }}</label>
               <select
                 v-model="cookingTime"
                 class="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
               >
-                <option value="">선택</option>
-                <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}분</option>
+                <option value="">{{ t('creator.selectOption') }}</option>
+                <option v-for="time in timeOptions" :key="time" :value="time">{{ time }}{{ t('common.minutes') }}</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">🔥 난이도</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">🔥 {{ t('creator.difficultyLabel') }}</label>
               <select
                 v-model="difficulty"
                 class="w-full px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
               >
-                <option value="">선택</option>
-                <option v-for="d in difficultyOptions" :key="d.value" :value="d.value">{{ d.label }}</option>
+                <option value="">{{ t('creator.selectOption') }}</option>
+                <option v-for="key in difficultyKeys" :key="key" :value="key">{{ t(`creator.difficulty.${key}`) }}</option>
               </select>
             </div>
           </div>
@@ -282,7 +280,7 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
 
       <!-- Step 2: 재료 -->
       <div v-else-if="step === 2" class="bg-white rounded-2xl p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">재료</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('creator.ingredients') }}</h2>
 
         <!-- 검색 -->
         <div class="mb-4">
@@ -290,7 +288,7 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
             <input
               v-model="searchQuery"
               type="text"
-              placeholder="🔍 재료 검색..."
+              :placeholder="t('creator.searchIngredients')"
               class="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
             />
             <button
@@ -298,7 +296,7 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
               @click="addCustomIngredient"
               class="px-4 py-3 bg-gray-100 rounded-xl text-sm font-medium"
             >
-              추가
+              {{ t('creator.addCustom') }}
             </button>
           </div>
         </div>
@@ -340,10 +338,10 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
 
         <!-- 선택된 재료 -->
         <div class="border-t border-gray-200 pt-4">
-          <p class="text-sm text-gray-500 mb-2">선택한 재료 ({{ selectedIngredients.length }})</p>
+          <p class="text-sm text-gray-500 mb-2">{{ t('creator.selectedIngredients', { count: selectedIngredients.length }) }}</p>
 
           <div v-if="selectedIngredients.length === 0" class="text-center py-6 text-gray-400">
-            재료를 선택해주세요
+            {{ t('creator.selectIngredientsPlease') }}
           </div>
 
           <div v-else class="space-y-2">
@@ -356,7 +354,7 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
               <input
                 v-model="ing.amount"
                 type="text"
-                placeholder="양 (예: 200g)"
+                :placeholder="t('creator.amount')"
                 class="flex-1 px-2 py-1 border border-gray-200 rounded text-sm"
               />
               <button
@@ -372,7 +370,7 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
 
       <!-- Step 3: 조리법 -->
       <div v-else-if="step === 3" class="bg-white rounded-2xl p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">조리법</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('creator.cookingSteps') }}</h2>
 
         <div class="space-y-3">
           <div
@@ -386,7 +384,7 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
             <div class="flex-1">
               <textarea
                 v-model="recipeStep.description"
-                placeholder="조리 과정을 입력하세요..."
+                :placeholder="t('creator.enterCookingStep')"
                 rows="2"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
               ></textarea>
@@ -405,13 +403,13 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
           @click="addStep"
           class="w-full mt-4 py-3 border border-dashed border-gray-300 rounded-xl text-gray-500 hover:bg-gray-50"
         >
-          + 단계 추가
+          {{ t('creator.addStep') }}
         </button>
       </div>
 
       <!-- Step 4: 미리보기 & 완료 -->
       <div v-else-if="step === 4" class="bg-white rounded-2xl p-5 shadow-sm">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">미리보기</h2>
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('creator.preview') }}</h2>
 
         <!-- 썸네일 -->
         <div v-if="youtubeThumbnail" class="rounded-lg overflow-hidden mb-4">
@@ -424,16 +422,16 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
         <!-- 제목 -->
         <h3 class="text-xl font-semibold text-gray-900">{{ title }}</h3>
         <div class="flex items-center gap-2 text-sm text-gray-500 mt-1">
-          <span v-if="category">{{ category }}</span>
-          <span v-if="cookingTime">• {{ cookingTime }}분</span>
+          <span v-if="category">{{ t(`creator.categories.${category}`) }}</span>
+          <span v-if="cookingTime">• {{ cookingTime }}{{ t('common.minutes') }}</span>
           <span v-if="difficulty">
-            • {{ difficulty === 'easy' ? '쉬움' : difficulty === 'medium' ? '보통' : '어려움' }}
+            • {{ t(`creator.difficulty.${difficulty}`) }}
           </span>
         </div>
 
         <!-- 재료 -->
         <div class="mt-4">
-          <p class="text-sm font-medium text-gray-700 mb-2">🥕 재료 ({{ selectedIngredients.length }})</p>
+          <p class="text-sm font-medium text-gray-700 mb-2">{{ t('creator.ingredientsPreview', { count: selectedIngredients.length }) }}</p>
           <div class="flex flex-wrap gap-1.5">
             <span
               v-for="ing in selectedIngredients"
@@ -447,7 +445,7 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
 
         <!-- 조리법 -->
         <div class="mt-4">
-          <p class="text-sm font-medium text-gray-700 mb-2">📋 조리법</p>
+          <p class="text-sm font-medium text-gray-700 mb-2">{{ t('creator.cookingStepsPreview') }}</p>
           <div class="space-y-2">
             <div
               v-for="(s, i) in recipeSteps.filter(s => s.description.trim())"
@@ -471,14 +469,14 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
           @click="prevStep"
           class="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50"
         >
-          ← 이전
+          {{ t('creator.previous') }}
         </button>
         <button
           v-if="step < totalSteps"
           @click="nextStep"
           class="flex-1 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800"
         >
-          다음 →
+          {{ t('creator.nextStep') }}
         </button>
         <button
           v-else
@@ -486,8 +484,8 @@ const timeOptions = ['5', '10', '15', '20', '30', '45', '60', '90', '120']
           :disabled="isLoading"
           class="flex-1 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:bg-gray-300"
         >
-          <span v-if="isLoading">저장 중...</span>
-          <span v-else>🚀 레시피 등록</span>
+          <span v-if="isLoading">{{ t('creator.saving') }}</span>
+          <span v-else>{{ t('creator.publishRecipe') }}</span>
         </button>
       </div>
     </main>

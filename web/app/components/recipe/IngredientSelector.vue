@@ -1,5 +1,7 @@
 <script setup lang="ts">
-const { t } = useI18n()
+import type { CuisinePreference } from '~/composables/useRecipeSearch'
+
+const { t, locale } = useI18n()
 
 export interface Ingredient {
   id: number
@@ -8,6 +10,7 @@ export interface Ingredient {
 }
 
 const model = defineModel<Ingredient[]>({ default: () => [] })
+const cuisineModel = defineModel<CuisinePreference>('cuisine', { default: 'mixed' })
 
 const props = defineProps<{
   myIngredients?: Ingredient[]
@@ -20,7 +23,9 @@ const emit = defineEmits<{
 
 const activeCategory = ref<string | null>(null)
 
-const { data: baseData } = await useFetch('/api/ingredients/base')
+const { data: baseData } = await useFetch('/api/ingredients/base', {
+  watch: [locale]
+})
 
 const categories = computed(() => baseData.value?.categories || [])
 const groupedIngredients = computed(() => baseData.value?.grouped || {})
@@ -76,6 +81,35 @@ function toggleExcludeMyIngredient(ingredient: Ingredient) {
     <div class="px-4 py-3 border-b border-gray-100">
       <h2 class="font-semibold text-gray-900">{{ t('ingredient.selectTitle') }}</h2>
       <p class="text-sm text-gray-500 mt-1">{{ t('ingredient.selectSubtitle') }}</p>
+    </div>
+
+    <!-- 레시피 스타일 -->
+    <div class="px-4 py-3 border-b border-gray-100">
+      <p class="text-xs font-medium text-gray-500 mb-2">{{ t('ingredient.cuisineLabel') }}</p>
+      <div class="flex rounded-lg border border-gray-200 overflow-hidden">
+        <button
+          @click="cuisineModel = 'korean'"
+          :class="[
+            'flex-1 py-1.5 text-sm font-medium transition-colors',
+            cuisineModel === 'korean'
+              ? 'bg-gray-900 text-white'
+              : 'bg-white text-gray-500 hover:bg-gray-50'
+          ]"
+        >
+          {{ t('ingredient.cuisineKorean') }}
+        </button>
+        <button
+          @click="cuisineModel = 'mixed'"
+          :class="[
+            'flex-1 py-1.5 text-sm font-medium transition-colors',
+            cuisineModel === 'mixed'
+              ? 'bg-gray-900 text-white'
+              : 'bg-white text-gray-500 hover:bg-gray-50'
+          ]"
+        >
+          {{ t('ingredient.cuisineMixed') }}
+        </button>
+      </div>
     </div>
 
     <!-- 내 재료 -->

@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import type { Dish } from '~/composables/useRecipeSearch'
-
-const { selectedIngredients, dishes, isLoading, isLoadingMore, hasMore, total, loadMore } = useRecipeSearch()
+const { selectedIngredients, allIngredients, dishes, isSearching, hasMore, totalCount, loadMore } = useRecipeSearch()
+const { t } = useI18n()
 
 // 무한 스크롤을 위한 Intersection Observer
 const loadMoreTrigger = ref<HTMLElement | null>(null)
 
-function viewDish(dish: Dish) {
+function viewDish(dish: any) {
   if (dish.isUserRecipe) {
     navigateTo(`/recipe/${dish.id}`)
   } else {
@@ -14,59 +13,67 @@ function viewDish(dish: Dish) {
   }
 }
 
-// Intersection Observer 설정
-onMounted(() => {
+const observer = ref<IntersectionObserver | null>(null)
+
+function setupObserver() {
+  if (observer.value) observer.value.disconnect()
   if (!loadMoreTrigger.value) return
 
-  const observer = new IntersectionObserver(
+  observer.value = new IntersectionObserver(
     (entries) => {
-      const entry = entries[0]
-      if (entry?.isIntersecting && hasMore.value && !isLoadingMore.value) {
+      if (entries[0].isIntersecting && hasMore.value && !isSearching.value) {
         loadMore()
       }
     },
-    { rootMargin: '100px' }
+    { rootMargin: '200px' }
   )
+  observer.value.observe(loadMoreTrigger.value)
+}
 
-  observer.observe(loadMoreTrigger.value)
+watch(loadMoreTrigger, () => {
+  setupObserver()
+})
 
-  onUnmounted(() => {
-    observer.disconnect()
-  })
+onMounted(() => {
+  setupObserver()
+})
+
+onUnmounted(() => {
+  observer.value?.disconnect()
 })
 </script>
 
 <template>
   <div>
     <div class="mb-6">
-      <h1 class="text-2xl font-semibold text-gray-900">레시피 검색</h1>
+      <h1 class="text-2xl font-semibold text-gray-900">{{ t('nav.recipeSearch') }}</h1>
       <p class="text-gray-500 mt-1">
-        <span v-if="selectedIngredients.length > 0 && total > 0">
-          {{ total }}개의 요리 중 {{ dishes.length }}개 표시
+        <span v-if="allIngredients.length > 0 && totalCount > 0">
+          {{ t('home.dishCountDisplay', { total: totalCount, shown: dishes.length }) }}
         </span>
-        <span v-else-if="selectedIngredients.length > 0 && !isLoading">
-          요리를 찾을 수 없습니다
+        <span v-else-if="allIngredients.length > 0 && !isSearching">
+          {{ t('home.noDishesFound') }}
         </span>
-        <span v-else>재료를 선택하면 만들 수 있는 요리를 찾아드려요</span>
+        <span v-else>{{ t('home.selectIngredientsHint') }}</span>
       </p>
     </div>
 
     <!-- 로딩 -->
-    <div v-if="isLoading" class="text-center py-12 text-gray-500">
+    <div v-if="isSearching" class="text-center py-12 text-gray-500">
       <div class="inline-block animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-gray-600 mb-2"></div>
-      <p>검색 중...</p>
+      <p>{{ t('home.searchingRecipes') }}</p>
     </div>
 
     <!-- 빈 상태 -->
-    <div v-else-if="selectedIngredients.length === 0" class="text-center py-16">
+    <div v-else-if="allIngredients.length === 0" class="text-center py-16">
       <p class="text-5xl mb-4">🥕</p>
-      <p class="text-gray-500">왼쪽에서 재료를 선택해보세요</p>
+      <p class="text-gray-500">{{ t('home.selectIngredientsHint') }}</p>
     </div>
 
     <!-- 결과 없음 -->
     <div v-else-if="dishes.length === 0" class="text-center py-16">
       <p class="text-5xl mb-4">😢</p>
-      <p class="text-gray-500">선택한 재료로 만들 수 있는 요리가 없습니다</p>
+      <p class="text-gray-500">{{ t('home.noRecipesFound') }}</p>
     </div>
 
     <!-- 요리 목록 -->
@@ -80,7 +87,7 @@ onMounted(() => {
         >
           <!-- 사용자 레시피 배지 -->
           <div v-if="dish.isUserRecipe" class="absolute -top-2 -right-2 bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
-            크리에이터
+            {{ t('home.creatorBadge') }}
           </div>
 
           <div class="flex gap-4">
@@ -112,7 +119,7 @@ onMounted(() => {
                 <img
                   v-if="dish.creator.profileImage"
                   :src="dish.creator.profileImage"
-                  :alt="dish.creator.nickname || '크리에이터'"
+                  :alt="dish.creator.nickname || t('home.creatorBadge')"
                   class="w-4 h-4 rounded-full"
                 />
                 <span class="text-xs text-gray-500">{{ dish.creator.nickname || dish.creator.channelName }}</span>
@@ -120,7 +127,7 @@ onMounted(() => {
 
               <div class="flex items-center gap-2 mt-2">
                 <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
-                  일치 {{ dish.match_count }}/{{ dish.total_count }}
+                  {{ t('home.matchCount', { match: dish.match_count, total: dish.total_count }) }}
                 </span>
                 <!-- 조회수/좋아요 (사용자 레시피만) -->
                 <span v-if="dish.isUserRecipe && dish.viewCount" class="text-xs text-gray-400">
@@ -138,12 +145,12 @@ onMounted(() => {
 
       <!-- 더 불러오기 트리거 & 로딩 표시 -->
       <div ref="loadMoreTrigger" class="py-8 text-center">
-        <div v-if="isLoadingMore" class="text-gray-500">
+        <div v-if="isSearching" class="text-gray-500">
           <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600 mb-1"></div>
-          <p class="text-sm">더 불러오는 중...</p>
+          <p class="text-sm">{{ t('home.loadingMore') }}</p>
         </div>
         <p v-else-if="!hasMore && dishes.length > 0" class="text-sm text-gray-400">
-          모든 레시피를 불러왔습니다
+          {{ t('home.allRecipesLoaded') }}
         </p>
       </div>
     </template>

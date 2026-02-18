@@ -5,6 +5,7 @@ import { findUserById, type User } from './user-db'
 
 const TOKEN_NAME = 'ihavenomenu_token'
 const TOKEN_MAX_AGE = 60 * 60 * 24 * 7 // 7일
+let jwtSecretWarned = false
 
 export interface JwtPayload {
   userId: number
@@ -14,6 +15,12 @@ export interface JwtPayload {
 
 export function createToken(userId: number): string {
   const config = useRuntimeConfig()
+
+  if (!jwtSecretWarned && config.jwtSecret === 'ihavenomenu-secret-key-change-in-production') {
+    console.warn('[AUTH] ⚠️  WARNING: Using default JWT secret! Set JWT_SECRET environment variable for production.')
+    jwtSecretWarned = true
+  }
+
   return jwt.sign(
     { userId },
     config.jwtSecret,

@@ -1,24 +1,30 @@
 import { YoutubeTranscript } from 'youtube-transcript'
+import { getLocale } from '../../utils/locale'
 
 export default defineEventHandler(async (event) => {
+  requireAuth(event)
+  checkRateLimit(event, { maxRequests: 20, windowMs: 60000 })
+
   const query = getQuery(event)
   const videoId = query.videoId as string
   const ingredients = (query.ingredients as string)?.split(',').map(i => i.trim().toLowerCase()) || []
+  const locale = getLocale(event)
 
-  if (!videoId) {
+  if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
     throw createError({
       statusCode: 400,
-      message: 'Video ID required'
+      message: 'Valid Video ID required'
     })
   }
 
   try {
-    // 한국어 자막 우선, 없으면 자동 생성 자막
+    // locale에 따라 자막 언어 우선순위 변경
+    const preferredLang = locale === 'en' ? 'en' : 'ko'
     let transcript
     try {
-      transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'ko' })
+      transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang: preferredLang })
     } catch {
-      // 한국어 없으면 기본 자막 시도
+      // 선호 언어 없으면 기본 자막 시도
       transcript = await YoutubeTranscript.fetchTranscript(videoId)
     }
 
@@ -52,7 +58,7 @@ export default defineEventHandler(async (event) => {
       videoId,
       hasTranscript: false,
       ingredientMatch: null,
-      error: error.message
+      error: 'Transcript fetch failed'
     }
   }
 })

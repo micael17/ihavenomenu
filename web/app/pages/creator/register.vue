@@ -3,6 +3,7 @@ definePageMeta({
   middleware: 'auth'
 })
 
+const { t } = useI18n()
 const { user } = useAuth()
 
 const step = ref(1)
@@ -55,10 +56,10 @@ async function fetchChannelInfo() {
       }
       step.value = 2
     } else {
-      error.value = '올바른 YouTube 채널 URL을 입력해주세요'
+      error.value = t('creator.invalidUrl')
     }
   } catch (e) {
-    error.value = '채널 정보를 가져오는데 실패했습니다'
+    error.value = t('creator.fetchError')
   } finally {
     isLoadingChannel.value = false
   }
@@ -86,7 +87,7 @@ async function registerCreator() {
 
     navigateTo('/creator/recipes/new')
   } catch (e) {
-    error.value = '등록에 실패했습니다. 다시 시도해주세요.'
+    error.value = t('creator.registerError')
   } finally {
     isLoading.value = false
   }
@@ -102,16 +103,16 @@ async function registerCreator() {
       <div v-if="step === 1" class="bg-white rounded-2xl p-6 shadow-sm">
         <div class="text-center mb-6">
           <span class="text-5xl">👨‍🍳</span>
-          <h1 class="text-xl font-semibold text-gray-900 mt-4">크리에이터로 시작하기</h1>
+          <h1 class="text-xl font-semibold text-gray-900 mt-4">{{ t('creator.registerTitle') }}</h1>
           <p class="text-gray-500 mt-2 text-sm">
-            레시피를 공유하고 채널을 홍보하세요!
+            {{ t('creator.registerSubtitle') }}
           </p>
         </div>
 
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
-              📺 YouTube 채널 URL
+              📺 {{ t('creator.youtubeChannelUrl') }}
             </label>
             <input
               v-model="youtubeUrl"
@@ -128,8 +129,8 @@ async function registerCreator() {
             :disabled="!youtubeUrl || isLoadingChannel"
             class="w-full py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            <span v-if="isLoadingChannel">확인 중...</span>
-            <span v-else>채널 연동하기</span>
+            <span v-if="isLoadingChannel">{{ t('creator.checking') }}</span>
+            <span v-else>{{ t('creator.linkChannel') }}</span>
           </button>
 
           <div class="relative">
@@ -137,7 +138,7 @@ async function registerCreator() {
               <div class="w-full border-t border-gray-200"></div>
             </div>
             <div class="relative flex justify-center text-sm">
-              <span class="px-4 bg-white text-gray-500">또는</span>
+              <span class="px-4 bg-white text-gray-500">{{ t('creator.or') }}</span>
             </div>
           </div>
 
@@ -145,10 +146,10 @@ async function registerCreator() {
             @click="skipChannel"
             class="w-full py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50"
           >
-            채널 없이 시작하기
+            {{ t('creator.startWithoutChannel') }}
           </button>
           <p class="text-xs text-gray-400 text-center">
-            나중에 채널을 연동할 수 있어요
+            {{ t('creator.linkLater') }}
           </p>
         </div>
       </div>
@@ -157,7 +158,7 @@ async function registerCreator() {
       <div v-else-if="step === 2" class="bg-white rounded-2xl p-6 shadow-sm">
         <div class="text-center mb-6">
           <span class="text-5xl">✅</span>
-          <h1 class="text-xl font-semibold text-gray-900 mt-4">준비 완료!</h1>
+          <h1 class="text-xl font-semibold text-gray-900 mt-4">{{ t('creator.ready') }}</h1>
         </div>
 
         <!-- 채널 정보 표시 -->
@@ -168,20 +169,19 @@ async function registerCreator() {
             </div>
             <div>
               <p class="font-medium text-gray-900">{{ channelInfo.name }}</p>
-              <p class="text-sm text-gray-500">YouTube 채널</p>
+              <p class="text-sm text-gray-500">{{ t('creator.youtubeChannel') }}</p>
             </div>
           </div>
         </div>
 
         <div v-else class="bg-gray-50 rounded-xl p-4 mb-6 text-center">
-          <p class="text-gray-600">채널 연동 없이 시작합니다</p>
-          <p class="text-sm text-gray-400 mt-1">설정에서 나중에 연동할 수 있어요</p>
+          <p class="text-gray-600">{{ t('creator.noChannelStart') }}</p>
+          <p class="text-sm text-gray-400 mt-1">{{ t('creator.noChannelHint') }}</p>
         </div>
 
         <div class="space-y-3">
           <p class="text-sm text-gray-600 text-center mb-4">
-            크리에이터가 되면 레시피를 작성하고<br />
-            다른 사용자들과 공유할 수 있어요!
+            {{ t('creator.creatorBenefit') }}
           </p>
 
           <button
@@ -189,15 +189,15 @@ async function registerCreator() {
             :disabled="isLoading"
             class="w-full py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 disabled:bg-gray-300"
           >
-            <span v-if="isLoading">등록 중...</span>
-            <span v-else>🚀 크리에이터 시작하기</span>
+            <span v-if="isLoading">{{ t('creator.registering') }}</span>
+            <span v-else>🚀 {{ t('creator.startCreator') }}</span>
           </button>
 
           <button
             @click="step = 1"
             class="w-full py-3 text-gray-500 text-sm hover:text-gray-700"
           >
-            ← 이전으로
+            ← {{ t('creator.previous') }}
           </button>
         </div>
 

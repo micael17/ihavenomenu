@@ -1,0 +1,127 @@
+name: Deploy to Lightsail
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: '배포할 브랜치'
+        required: true
+        default: 'main'
+        type: choice
+        options:
+          - main
+
+jobs:
+  deploy:
+    name: 🚀 ihavenomenu Lightsail 배포
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📝 배포 시작 로그
+        run: |
+          echo "🚀 배포 브랜치: ${{ github.event.inputs.branch || 'main' }}"
+          echo "👤 실행자: ${{ github.actor }}"
+          echo "⏰ 시간: $(date)"
+
+      - name: 📥 코드 체크아웃
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || 'main' }}
+
+      - name: 🔧 Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 npm 의존성 설치
+        run: npm ci
+        working-directory: web
+
+      - name: 🏗️ 애플리케이션 빌드
+        run: npm run build
+        working-directory: web
+        env:
+          NODE_ENV: production
+
+      - name: 📤 빌드 결과물 서버로 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USERNAME }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          port: 22
+          source: "web/.output,database,ecosystem.config.cjs"
+          target: "~/ihavenomenu-tmp"
+          rm: true
+          strip_components: 0
+          timeout: 10m
+          command_timeout: 10m
+
+      - name: 🔐 SSH로 Lightsail 배포
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USERNAME }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          port: 22
+          script: |
+            echo "🔧 PM2 설치 확인..."
+            if ! command -v pm2 &> /dev/null; then
+              sudo npm install -g pm2
+            fi
+
+            APP_DIR=/var/www/ihavenomenu
+
+            echo "📂 빌드 결과물 이동..."
+            sudo cp -r ~/ihavenomenu-tmp/web/.output $APP_DIR/.output-new
+            sudo cp -r ~/ihavenomenu-tmp/database $APP_DIR/database-new
+
+            echo "📦 네이티브 모듈 설치..."
+            cd $APP_DIR/.output-new/server
+            npm install better-sqlite3
+
+            echo "🔄 기존 빌드 교체..."
+            cd $APP_DIR
+            rm -rf .output-old database-old
+            if [ -d .output ]; then mv .output .output-old; fi
+            mv .output-new .output
+
+            # DB는 최초 배포 시에만 복사 (기존 DB 보존)
+            if [ ! -f database/ihavenomenu.db ]; then
+              echo "🗄️ 최초 배포: DB 복사..."
+              mv database-new database
+            else
+              echo "🗄️ 기존 DB 유지..."
+              rm -rf database-new
+            fi
+
+            echo "📝 환경변수 파일 확인..."
+            if [ ! -f .env ]; then
+              echo "⚠️  .env 파일이 없습니다. 서버에 직접 생성해주세요."
+              exit 1
+            fi
+
+            echo "🔄 앱 재시작..."
+            sudo chown -R ubuntu:ubuntu $APP_DIR/.output
+            pm2 restart ihavenomenu || pm2 start ecosystem.config.cjs
+
+            echo "🧹 정리..."
+            rm -rf ~/ihavenomenu-tmp
+            rm -rf $APP_DIR/.output-old
+
+            echo "📊 앱 상태 확인..."
+            sleep 3
+            pm2 status
+            pm2 save
+
+            echo "✅ 배포 완료!"
+
+      - name: ✅ 배포 완료 알림
+        run: |
+          echo "🎉 배포가 성공적으로 완료되었습니다!"
+          echo "📍 서버: ${{ secrets.LIGHTSAIL_HOST }}"
+          echo "🌐 URL: https://ihavenomenu.com"
+          echo "🌿 브랜치: ${{ github.event.inputs.branch || 'main' }}"

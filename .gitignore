@@ -23,5 +23,8 @@ Thumbs.db
 # Logs
 *.log
 
+# SSH keys
+*.pem
+
 # Database (optional - uncomment if you don't want to commit the DB)
 # database/*.db

@@ -1,4 +1,5 @@
 import { useDB, type Dish, type Recipe } from '../../utils/db'
+import { getLocale } from '../../utils/locale'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
@@ -11,10 +12,15 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = useDB()
+  const locale = getLocale(event)
+
+  const dishNameField = locale === 'en'
+    ? `COALESCE(name_en, name) as name`
+    : `name`
 
   // 요리 정보
   const dish = db.prepare(`
-    SELECT id, name, category, image_url, description
+    SELECT id, ${dishNameField}, category, image_url, description
     FROM dishes WHERE id = ?
   `).get(Number(id)) as Dish | undefined
 
@@ -25,6 +31,20 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // locale에 따른 재료명 필드
+  const ingNameExpr = locale === 'en'
+    ? `COALESCE(json_extract(i.aliases, '$[0]'), i.name)`
+    : `i.name`
+  const parentNameExpr = locale === 'en'
+    ? `COALESCE(json_extract(parent.aliases, '$[0]'), parent.name)`
+    : `parent.name`
+  const ingCatExpr = locale === 'en'
+    ? `COALESCE(i.category_en, i.category)`
+    : `i.category`
+  const parentCatExpr = locale === 'en'
+    ? `COALESCE(parent.category_en, parent.category)`
+    : `parent.category`
+
   // 이 요리에 사용된 기본 재료만 조회
   const ingredients = db.prepare(`
     SELECT DISTINCT
@@ -33,13 +53,16 @@ export default defineEventHandler(async (event) => {
         ELSE parent.id
       END as id,
       CASE
-        WHEN i.is_base = 1 THEN i.name
-        ELSE parent.name
+        WHEN i.is_base = 1 THEN ${ingNameExpr}
+        ELSE ${parentNameExpr}
       END as name,
       CASE
-        WHEN i.is_base = 1 THEN i.category
-        ELSE parent.category
-      END as category
+        WHEN i.is_base = 1 THEN ${ingCatExpr}
+        ELSE ${parentCatExpr}
+      END as category,
+      di.is_main,
+      di.is_optional,
+      di.amount
     FROM dish_ingredients di
     INNER JOIN ingredients i ON di.ingredient_id = i.id
     LEFT JOIN ingredients parent ON i.parent_id = parent.id AND parent.is_base = 1

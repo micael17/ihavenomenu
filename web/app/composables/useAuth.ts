@@ -3,15 +3,15 @@ interface User {
   nickname: string | null
   email: string | null
   profileImage: string | null
-  provider: 'google'
+  provider: 'google' | 'email'
   onboarding_completed: boolean
 }
 
-const user = ref<User | null>(null)
-const isLoading = ref(true)
-const isInitialized = ref(false)
-
 export function useAuth() {
+  const user = useState<User | null>('auth-user', () => null)
+  const isLoading = useState('auth-loading', () => true)
+  const isInitialized = useState('auth-initialized', () => false)
+
   async function fetchUser() {
     if (import.meta.server) return
 
@@ -31,6 +31,8 @@ export function useAuth() {
     try {
       await $fetch('/api/auth/logout', { method: 'POST' })
       user.value = null
+      const { resetState } = useRecipeSearch()
+      resetState()
       navigateTo('/')
     } catch (error) {
       console.error('로그아웃 오류:', error)
@@ -41,7 +43,37 @@ export function useAuth() {
     window.location.href = '/api/auth/google/login'
   }
 
+  async function loginWithEmail(email: string, password: string) {
+    const response = await $fetch<{ user: User; redirectTo: string }>('/api/auth/login', {
+      method: 'POST',
+      body: { email, password }
+    })
+    user.value = response.user
+    return response
+  }
+
+  async function registerWithEmail(email: string, password: string) {
+    const response = await $fetch<{ user: User; redirectTo: string }>('/api/auth/register', {
+      method: 'POST',
+      body: { email, password }
+    })
+    user.value = response.user
+    return response
+  }
+
   const isLoggedIn = computed(() => !!user.value)
+
+  function waitForAuth(): Promise<void> {
+    if (isInitialized.value) return Promise.resolve()
+    return new Promise((resolve) => {
+      const stop = watch(isInitialized, (val) => {
+        if (val) {
+          stop()
+          resolve()
+        }
+      })
+    })
+  }
 
   // 초기화 (앱 로드 시 한 번만)
   if (!isInitialized.value && import.meta.client) {
@@ -53,7 +85,10 @@ export function useAuth() {
     isLoading: readonly(isLoading),
     isLoggedIn,
     fetchUser,
+    waitForAuth,
     logout,
-    loginWithGoogle
+    loginWithGoogle,
+    loginWithEmail,
+    registerWithEmail
   }
 }

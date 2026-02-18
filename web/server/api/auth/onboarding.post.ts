@@ -3,11 +3,14 @@ interface OnboardingBody {
   favoriteDishes: string[]
   dislikedIngredients: string[]
   myIngredients?: {
-    main?: number
+    protein?: number
     sauce?: number
-    grain?: number
+    carb?: number
   }
 }
+
+const MAX_FAVORITES = 50
+const MAX_DISLIKED = 50
 
 export default defineEventHandler(async (event) => {
   const user = requireAuth(event)
@@ -28,12 +31,15 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const favoriteDishes = (body.favoriteDishes || []).slice(0, MAX_FAVORITES)
+  const dislikedIngredients = (body.dislikedIngredients || []).slice(0, MAX_DISLIKED)
+
   // 온보딩 완료 처리
   completeOnboarding(
     user.id,
     body.nickname.trim(),
-    body.favoriteDishes || [],
-    body.dislikedIngredients || [],
+    favoriteDishes,
+    dislikedIngredients,
     body.myIngredients
   )
 

@@ -1,13 +1,69 @@
 <script setup lang="ts">
 const { t } = useI18n()
-const { loginWithGoogle, isLoggedIn } = useAuth()
+const { loginWithGoogle, loginWithEmail, registerWithEmail, isLoggedIn } = useAuth()
+
+const route = useRoute()
 
 // 이미 로그인된 상태면 홈으로 리다이렉트
 watch(isLoggedIn, (loggedIn) => {
   if (loggedIn) {
-    navigateTo('/')
+    const redirect = route.query.redirect as string
+    navigateTo(redirect || '/')
   }
 }, { immediate: true })
+
+// 탭 상태
+const activeTab = ref<'login' | 'register'>('login')
+
+// 폼 상태
+const email = ref('')
+const password = ref('')
+const errorMessage = ref('')
+const isSubmitting = ref(false)
+
+// 유효성 검사
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const isEmailValid = computed(() => !email.value || (email.value.length <= 64 && emailRegex.test(email.value)))
+const isPasswordValid = computed(() => !password.value || (password.value.length >= 8 && password.value.length <= 16))
+const isFormValid = computed(() =>
+  email.value && password.value
+  && email.value.length <= 64 && emailRegex.test(email.value)
+  && password.value.length >= 8 && password.value.length <= 16
+)
+
+// 탭 전환 시 에러 초기화
+watch(activeTab, () => {
+  errorMessage.value = ''
+})
+
+async function handleSubmit() {
+  if (!isFormValid.value || isSubmitting.value) return
+
+  errorMessage.value = ''
+  isSubmitting.value = true
+
+  try {
+    const redirect = route.query.redirect as string
+    if (activeTab.value === 'register') {
+      const response = await registerWithEmail(email.value, password.value)
+      navigateTo(response.redirectTo === '/onboarding' ? '/onboarding' : (redirect || response.redirectTo))
+    } else {
+      const response = await loginWithEmail(email.value, password.value)
+      navigateTo(response.redirectTo === '/onboarding' ? '/onboarding' : (redirect || response.redirectTo))
+    }
+  } catch (error: any) {
+    const statusCode = error?.response?.status || error?.statusCode
+    if (activeTab.value === 'register' && statusCode === 409) {
+      errorMessage.value = t('auth.emailExists')
+    } else if (activeTab.value === 'login' && statusCode === 401) {
+      errorMessage.value = t('auth.loginFailed')
+    } else {
+      errorMessage.value = t('common.error')
+    }
+  } finally {
+    isSubmitting.value = false
+  }
+}
 
 function handleGoogleLogin() {
   loginWithGoogle()
@@ -22,16 +78,99 @@ function handleGoogleLogin() {
     <!-- 로그인 폼 -->
     <main class="flex-1 flex items-center justify-center px-4">
       <div class="bg-white w-full max-w-sm rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <!-- 헤더 -->
-        <div class="px-6 py-6 border-b border-gray-100">
-          <h1 class="text-xl font-semibold text-gray-900 text-center">{{ t('auth.loginTitle') }}</h1>
-          <p class="text-center text-gray-500 text-sm mt-2">
-            {{ t('auth.loginSubtitle') }}
-          </p>
+        <!-- 탭 -->
+        <div class="flex border-b border-gray-200">
+          <button
+            @click="activeTab = 'login'"
+            :class="[
+              'flex-1 py-3.5 text-sm font-medium transition-colors',
+              activeTab === 'login'
+                ? 'text-orange-600 border-b-2 border-orange-600'
+                : 'text-gray-500 hover:text-gray-700'
+            ]"
+          >
+            {{ t('auth.loginTab') }}
+          </button>
+          <button
+            @click="activeTab = 'register'"
+            :class="[
+              'flex-1 py-3.5 text-sm font-medium transition-colors',
+              activeTab === 'register'
+                ? 'text-orange-600 border-b-2 border-orange-600'
+                : 'text-gray-500 hover:text-gray-700'
+            ]"
+          >
+            {{ t('auth.registerTab') }}
+          </button>
         </div>
 
         <!-- 본문 -->
         <div class="p-6">
+          <!-- 이메일/비밀번호 폼 -->
+          <form @submit.prevent="handleSubmit" class="space-y-4">
+            <!-- 이메일 -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('auth.email') }}</label>
+              <input
+                v-model="email"
+                type="email"
+                :placeholder="t('auth.emailPlaceholder')"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-shadow"
+                :class="{ 'border-red-400 focus:ring-red-500': email && !isEmailValid }"
+              />
+              <p v-if="email && !isEmailValid" class="mt-1 text-xs text-red-500">
+                {{ t('auth.emailInvalid') }}
+              </p>
+            </div>
+
+            <!-- 비밀번호 -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('auth.password') }}</label>
+              <input
+                v-model="password"
+                type="password"
+                :placeholder="t('auth.passwordPlaceholder')"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-shadow"
+                :class="{ 'border-red-400 focus:ring-red-500': password && !isPasswordValid }"
+              />
+              <p v-if="password && password.length < 8" class="mt-1 text-xs text-red-500">
+                {{ t('auth.passwordMinError') }}
+              </p>
+              <p v-else-if="password && password.length > 16" class="mt-1 text-xs text-red-500">
+                {{ t('auth.passwordMaxError') }}
+              </p>
+            </div>
+
+            <!-- 에러 메시지 -->
+            <p v-if="errorMessage" class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+              {{ errorMessage }}
+            </p>
+
+            <!-- 제출 버튼 -->
+            <button
+              type="submit"
+              :disabled="!isFormValid || isSubmitting"
+              class="w-full py-3 rounded-xl font-medium text-white transition-colors"
+              :class="isFormValid && !isSubmitting
+                ? 'bg-orange-500 hover:bg-orange-600'
+                : 'bg-gray-300 cursor-not-allowed'"
+            >
+              {{ isSubmitting
+                ? t('common.processing')
+                : activeTab === 'login'
+                  ? t('auth.loginTab')
+                  : t('auth.registerTab')
+              }}
+            </button>
+          </form>
+
+          <!-- 구분선 -->
+          <div class="flex items-center my-5">
+            <div class="flex-1 border-t border-gray-200"></div>
+            <span class="px-3 text-sm text-gray-400">{{ t('auth.or') }}</span>
+            <div class="flex-1 border-t border-gray-200"></div>
+          </div>
+
           <!-- 구글 로그인 -->
           <button
             @click="handleGoogleLogin"

@@ -1,14 +1,19 @@
 import { useDB, type Ingredient } from '../../utils/db'
+import { getLocale } from '../../utils/locale'
 
 interface SearchResult extends Ingredient {
   match_type: 'exact' | 'prefix' | 'alias' | 'contains'
 }
 
 export default defineEventHandler(async (event) => {
+  checkRateLimit(event, { maxRequests: 30, windowMs: 60000 })
+
   const db = useDB()
   const query = getQuery(event)
+  const locale = getLocale(event)
 
   const q = (query.q as string || '').trim()
+  const sanitized = q.replace(/[%_]/g, '\\$&')
   const categoriesParam = query.categories as string | undefined
 
   if (!q) {
@@ -22,19 +27,31 @@ export default defineEventHandler(async (event) => {
   if (categoriesParam) {
     const categories = categoriesParam.split(',').map(c => c.trim())
     const placeholders = categories.map(() => '?').join(', ')
-    categoryFilter = ` AND category IN (${placeholders})`
-    categoryParams.push(...categories)
+    if (locale === 'en') {
+      categoryFilter = ` AND (category_en IN (${placeholders}) OR category IN (${placeholders}))`
+      categoryParams.push(...categories, ...categories)
+    } else {
+      categoryFilter = ` AND category IN (${placeholders})`
+      categoryParams.push(...categories)
+    }
   }
 
-  // 검색어
+  // 검색어 (LIKE 와일드카드 이스케이프)
   const searchTerm = q
-  const prefixPattern = `${searchTerm}%`
-  const containsPattern = `%${searchTerm}%`
+  const prefixPattern = `${sanitized}%`
+  const containsPattern = `%${sanitized}%`
+
+  const nameField = locale === 'en'
+    ? `COALESCE(json_extract(aliases, '$[0]'), name) as name`
+    : `name`
+  const categoryField = locale === 'en'
+    ? `COALESCE(category_en, category) as category`
+    : `category`
 
   // 검색 쿼리 - 우선순위에 따라 정렬
   const sql = `
     SELECT
-      id, name, category, is_base,
+      id, ${nameField}, ${categoryField}, is_base,
       CASE
         WHEN name = ? THEN 'exact'
         WHEN name LIKE ? THEN 'prefix'

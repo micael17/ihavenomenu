@@ -39,6 +39,7 @@ interface RecipeDetail {
   steps: RecipeStep[]
 }
 
+const { t } = useI18n()
 const route = useRoute()
 const recipeId = route.params.id
 
@@ -52,8 +53,8 @@ const youtubeEmbedUrl = computed(() => {
 })
 
 useSeoMeta({
-  title: () => recipe.value?.title ? `${recipe.value.title} - I Have No Menu` : '레시피 - I Have No Menu',
-  description: () => recipe.value?.description || '크리에이터가 공유한 레시피입니다'
+  title: () => recipe.value?.title ? `${recipe.value.title} - I Have No Menu` : `${t('recipe.recipe')} - I Have No Menu`,
+  description: () => recipe.value?.description || t('recipe.creatorRecipeDescription')
 })
 </script>
 
@@ -65,15 +66,15 @@ useSeoMeta({
       <!-- 뒤로가기 -->
       <NuxtLink to="/" class="inline-flex items-center gap-1 text-gray-500 hover:text-gray-900 mb-6">
         <span>&larr;</span>
-        <span>검색 결과로 돌아가기</span>
+        <span>{{ t('recipeDetail.backToSearch') }}</span>
       </NuxtLink>
 
       <!-- 에러 -->
       <div v-if="error" class="bg-white rounded-2xl p-8 text-center shadow-sm">
         <span class="text-5xl">😢</span>
-        <p class="mt-4 text-gray-600">레시피를 찾을 수 없습니다</p>
+        <p class="mt-4 text-gray-600">{{ t('recipeDetail.notFound') }}</p>
         <NuxtLink to="/" class="inline-block mt-4 text-orange-600 hover:underline">
-          홈으로 돌아가기
+          {{ t('recipeDetail.goHome') }}
         </NuxtLink>
       </div>
 
@@ -95,7 +96,7 @@ useSeoMeta({
           <div v-else-if="recipe.image_url || recipe.youtube_thumbnail" class="aspect-video bg-gray-100">
             <img
               :src="recipe.image_url ?? recipe.youtube_thumbnail ?? ''"
-              :alt="recipe.title ?? '레시피'"
+              :alt="recipe.title ?? ''"
               class="w-full h-full object-cover"
             />
           </div>
@@ -103,7 +104,7 @@ useSeoMeta({
           <div class="p-6">
             <!-- 크리에이터 배지 -->
             <span class="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full mb-3">
-              크리에이터 레시피
+              {{ t('recipeDetail.creatorRecipe') }}
             </span>
 
             <h1 class="text-2xl font-semibold text-gray-900">{{ recipe.title }}</h1>
@@ -113,14 +114,14 @@ useSeoMeta({
               <img
                 v-if="recipe.profile_image"
                 :src="recipe.profile_image"
-                :alt="recipe.nickname || '크리에이터'"
+                :alt="recipe.nickname || t('recipeDetail.creatorRecipe')"
                 class="w-10 h-10 rounded-full"
               />
               <div v-else class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
                 <span class="text-lg">👨‍🍳</span>
               </div>
               <div>
-                <p class="font-medium text-gray-900">{{ recipe.nickname || recipe.channel_name || '크리에이터' }}</p>
+                <p class="font-medium text-gray-900">{{ recipe.nickname || recipe.channel_name || t('recipeDetail.creatorRecipe') }}</p>
                 <a
                   v-if="recipe.youtube_channel_url"
                   :href="recipe.youtube_channel_url"
@@ -128,7 +129,7 @@ useSeoMeta({
                   rel="noopener"
                   class="text-sm text-red-600 hover:underline"
                 >
-                  YouTube 채널 방문
+                  {{ t('recipeDetail.visitYoutube') }}
                 </a>
               </div>
             </div>
@@ -139,7 +140,7 @@ useSeoMeta({
                 <span>🍽️</span> {{ recipe.category }}
               </span>
               <span v-if="recipe.cooking_time" class="flex items-center gap-1">
-                <span>⏱️</span> {{ recipe.cooking_time }}분
+                <span>⏱️</span> {{ recipe.cooking_time }}{{ t('recipeDetail.minutes') }}
               </span>
               <span v-if="recipe.difficulty" class="flex items-center gap-1">
                 <span>📊</span> {{ recipe.difficulty }}
@@ -161,7 +162,7 @@ useSeoMeta({
 
         <!-- 재료 -->
         <div v-if="recipe.ingredients?.length > 0" class="bg-white rounded-2xl shadow-sm p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">재료</h2>
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('recipeDetail.ingredients') }}</h2>
           <ul class="space-y-2">
             <li
               v-for="ingredient in recipe.ingredients"
@@ -170,7 +171,7 @@ useSeoMeta({
             >
               <span class="text-gray-700">
                 {{ ingredient.ingredient_name || ingredient.custom_name }}
-                <span v-if="ingredient.is_main" class="text-xs text-orange-600 ml-1">(메인)</span>
+                <span v-if="ingredient.is_main" class="text-xs text-orange-600 ml-1">{{ t('recipeDetail.mainIngredient') }}</span>
               </span>
               <span v-if="ingredient.amount" class="text-gray-500 text-sm">{{ ingredient.amount }}</span>
             </li>
@@ -179,7 +180,7 @@ useSeoMeta({
 
         <!-- 조리 순서 -->
         <div v-if="recipe.steps?.length > 0" class="bg-white rounded-2xl shadow-sm p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">조리 순서</h2>
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('recipeDetail.cookingSteps') }}</h2>
           <ol class="space-y-4">
             <li
               v-for="step in recipe.steps"
@@ -205,7 +206,7 @@ useSeoMeta({
 
       <!-- 로딩 -->
       <div v-else class="bg-white rounded-2xl p-8 text-center shadow-sm">
-        <p class="text-gray-500">로딩 중...</p>
+        <p class="text-gray-500">{{ t('recipeDetail.loading') }}</p>
       </div>
     </main>
   </div>

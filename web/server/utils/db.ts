@@ -6,8 +6,8 @@ let db: Database.Database | null = null
 export function useDB(): Database.Database {
   if (db) return db
 
-  // 절대 경로로 DB 파일 지정 (프로젝트 루트의 database 폴더)
-  const dbPath = resolve(process.cwd(), '../database/ihavenomenu.db')
+  const config = useRuntimeConfig()
+  const dbPath = resolve(config.dbPath)
 
   console.log('[DB] Connecting to:', dbPath)
 
@@ -21,13 +21,16 @@ export interface Ingredient {
   id: number
   name: string
   category: string | null
+  category_en: string | null
   parent_id: number | null
   is_base: boolean
+  aliases: string | null
 }
 
 export interface Dish {
   id: number
   name: string
+  name_en: string | null
   category: string | null
   image_url: string | null
   description: string | null

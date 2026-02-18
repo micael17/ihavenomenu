@@ -6,12 +6,13 @@ let userDb: Database.Database | null = null
 export function useUserDB(): Database.Database {
   if (userDb) return userDb
 
-  const dbPath = resolve(process.cwd(), '../database/ihavenomenu.db')
+  const config = useRuntimeConfig()
+  const dbPath = resolve(config.dbPath)
 
   console.log('[UserDB] Connecting to:', dbPath)
 
-  // 사용자 데이터 저장을 위해 readonly: false
   userDb = new Database(dbPath, { readonly: false })
+  userDb.pragma('journal_mode = WAL')
 
   // 사용자 테이블 초기화
   initUserTables(userDb)
@@ -27,6 +28,7 @@ function initUserTables(db: Database.Database) {
       provider TEXT NOT NULL,
       provider_id TEXT NOT NULL,
       email TEXT,
+      password_hash TEXT,
       nickname TEXT,
       profile_image TEXT,
       onboarding_completed INTEGER DEFAULT 0,
@@ -125,15 +127,23 @@ function initUserTables(db: Database.Database) {
     )
   `)
 
+  // password_hash 컬럼 마이그레이션 (기존 DB 대응)
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN password_hash TEXT`)
+  } catch {
+    // 이미 존재하면 무시
+  }
+
   console.log('[UserDB] Tables initialized')
 }
 
 // 타입 정의
 export interface User {
   id: number
-  provider: 'google'
+  provider: 'google' | 'email'
   provider_id: string
   email: string | null
+  password_hash: string | null
   nickname: string | null
   profile_image: string | null
   onboarding_completed: number
@@ -194,9 +204,34 @@ export interface UserRecipeStep {
   image_url: string | null
 }
 
+// 사용자 프로필 업데이트
+export function updateUserProfile(userId: number, data: { email?: string; nickname?: string; profileImage?: string }) {
+  const db = useUserDB()
+  const updates: string[] = []
+  const values: any[] = []
+
+  if (data.email !== undefined) {
+    updates.push('email = ?')
+    values.push(data.email)
+  }
+  if (data.nickname !== undefined) {
+    updates.push('nickname = ?')
+    values.push(data.nickname)
+  }
+  if (data.profileImage !== undefined) {
+    updates.push('profile_image = ?')
+    values.push(data.profileImage)
+  }
+
+  if (updates.length === 0) return
+
+  values.push(userId)
+  db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values)
+}
+
 // 사용자 조회/생성
 export function findOrCreateUser(
-  provider: 'google',
+  provider: 'google' | 'email',
   providerId: string
 ): { user: User; isNew: boolean } {
   const db = useUserDB()
@@ -222,6 +257,7 @@ export function findOrCreateUser(
       provider,
       provider_id: providerId,
       email: null,
+      password_hash: null,
       nickname: null,
       profile_image: null,
       onboarding_completed: 0,
@@ -234,6 +270,42 @@ export function findOrCreateUser(
 export function findUserById(id: number): User | undefined {
   const db = useUserDB()
   return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as User | undefined
+}
+
+// 이메일로 유저 조회
+export function findUserByEmail(email: string): User | undefined {
+  const db = useUserDB()
+  return db.prepare(
+    'SELECT * FROM users WHERE provider = ? AND email = ?'
+  ).get('email', email) as User | undefined
+}
+
+// 이메일 유저 생성
+export function createEmailUser(
+  email: string,
+  passwordHash: string
+): { user: User; isNew: boolean } {
+  const db = useUserDB()
+
+  const result = db.prepare(`
+    INSERT INTO users (provider, provider_id, email, password_hash)
+    VALUES (?, ?, ?, ?)
+  `).run('email', email, email, passwordHash)
+
+  return {
+    user: {
+      id: result.lastInsertRowid as number,
+      provider: 'email',
+      provider_id: email,
+      email,
+      password_hash: passwordHash,
+      nickname: null,
+      profile_image: null,
+      onboarding_completed: 0,
+      created_at: new Date().toISOString()
+    },
+    isNew: true
+  }
 }
 
 // 온보딩 완료
@@ -250,47 +322,50 @@ export function completeOnboarding(
 ) {
   const db = useUserDB()
 
-  // 닉네임 업데이트 및 온보딩 완료
-  db.prepare(`
-    UPDATE users SET nickname = ?, onboarding_completed = 1 WHERE id = ?
-  `).run(nickname, userId)
+  const run = db.transaction(() => {
+    // 닉네임 업데이트 및 온보딩 완료
+    db.prepare(`
+      UPDATE users SET nickname = ?, onboarding_completed = 1 WHERE id = ?
+    `).run(nickname, userId)
 
-  // 기존 취향 데이터 삭제
-  db.prepare(`DELETE FROM user_preferences WHERE user_id = ?`).run(userId)
+    // 기존 취향 데이터 삭제
+    db.prepare(`DELETE FROM user_preferences WHERE user_id = ?`).run(userId)
 
-  // 좋아하는 요리 저장
-  const insertPref = db.prepare(`
-    INSERT INTO user_preferences (user_id, preference_type, value)
-    VALUES (?, ?, ?)
-  `)
-
-  for (const dish of favoriteDishes) {
-    insertPref.run(userId, 'favorite_dish', dish)
-  }
-
-  // 싫어하는 재료 저장
-  for (const ingredient of dislikedIngredients) {
-    insertPref.run(userId, 'disliked_ingredient', ingredient)
-  }
-
-  // 내 재료 저장 (온보딩에서 선택한 재료)
-  if (myIngredients) {
-    const insertIngredient = db.prepare(`
-      INSERT OR IGNORE INTO user_ingredients (user_id, ingredient_id)
-      VALUES (?, ?)
+    // 좋아하는 요리 저장
+    const insertPref = db.prepare(`
+      INSERT INTO user_preferences (user_id, preference_type, value)
+      VALUES (?, ?, ?)
     `)
 
-    if (myIngredients.protein) {
-      insertIngredient.run(userId, myIngredients.protein)
+    for (const dish of favoriteDishes) {
+      insertPref.run(userId, 'favorite_dish', dish)
     }
-    if (myIngredients.sauce) {
-      insertIngredient.run(userId, myIngredients.sauce)
-    }
-    if (myIngredients.carb) {
-      insertIngredient.run(userId, myIngredients.carb)
-    }
-  }
 
+    // 싫어하는 재료 저장
+    for (const ingredient of dislikedIngredients) {
+      insertPref.run(userId, 'disliked_ingredient', ingredient)
+    }
+
+    // 내 재료 저장 (온보딩에서 선택한 재료)
+    if (myIngredients) {
+      const insertIngredient = db.prepare(`
+        INSERT OR IGNORE INTO user_ingredients (user_id, ingredient_id)
+        VALUES (?, ?)
+      `)
+
+      if (myIngredients.protein) {
+        insertIngredient.run(userId, myIngredients.protein)
+      }
+      if (myIngredients.sauce) {
+        insertIngredient.run(userId, myIngredients.sauce)
+      }
+      if (myIngredients.carb) {
+        insertIngredient.run(userId, myIngredients.carb)
+      }
+    }
+  })
+
+  run()
   return { success: true }
 }
 
@@ -316,10 +391,17 @@ export function getUserPreferences(userId: number) {
 }
 
 // 사용자 재료 관리
-export function getUserIngredients(userId: number) {
+export function getUserIngredients(userId: number, locale: 'en' | 'ko' = 'ko') {
   const db = useUserDB()
+  const nameField = locale === 'en'
+    ? `COALESCE(json_extract(i.aliases, '$[0]'), i.name) as name`
+    : `i.name`
+  const categoryField = locale === 'en'
+    ? `COALESCE(i.category_en, i.category) as category`
+    : `i.category`
+
   return db.prepare(`
-    SELECT ui.*, i.name, i.category
+    SELECT ui.*, ${nameField}, ${categoryField}
     FROM user_ingredients ui
     JOIN ingredients i ON ui.ingredient_id = i.id
     WHERE ui.user_id = ?
@@ -366,10 +448,17 @@ export function updateUserIngredientExpiry(userId: number, ingredientId: number,
 }
 
 // 유통기한 임박 재료 조회 (D-3 이하)
-export function getExpiringIngredients(userId: number) {
+export function getExpiringIngredients(userId: number, locale: 'en' | 'ko' = 'ko') {
   const db = useUserDB()
+  const nameField = locale === 'en'
+    ? `COALESCE(json_extract(i.aliases, '$[0]'), i.name) as name`
+    : `i.name`
+  const categoryField = locale === 'en'
+    ? `COALESCE(i.category_en, i.category) as category`
+    : `i.category`
+
   return db.prepare(`
-    SELECT ui.*, i.name, i.category,
+    SELECT ui.*, ${nameField}, ${categoryField},
       julianday(ui.expiry_date) - julianday('now') as days_left
     FROM user_ingredients ui
     JOIN ingredients i ON ui.ingredient_id = i.id
@@ -604,7 +693,7 @@ export function deleteUserRecipe(recipeId: number, creatorId: number) {
 
   // 관련 데이터는 CASCADE로 자동 삭제
   db.prepare('DELETE FROM user_recipes WHERE id = ?').run(recipeId)
-  db.prepare('UPDATE creators SET recipe_count = recipe_count - 1 WHERE id = ?').run(creatorId)
+  db.prepare('UPDATE creators SET recipe_count = MAX(recipe_count - 1, 0) WHERE id = ?').run(creatorId)
 
   return { deleted: true }
 }

@@ -48,6 +48,7 @@ interface YouTubeVideo {
 }
 
 const route = useRoute()
+const { t, locale } = useI18n()
 const { selectedIngredients } = useRecipeSearch()
 
 const dishDetail = ref<DishDetail | null>(null)
@@ -84,9 +85,10 @@ async function fetchYoutubeVideos(dishName: string, mainIngredients: string[] = 
   isLoadingYoutube.value = true
   try {
     const ingredientNames = selectedIngredients.value.map(i => i.name).join(',')
+    const recipeSuffix = locale.value === 'en' ? 'recipe' : '레시피'
     const searchQuery = mainIngredients.length > 0
-      ? `${dishName} 레시피 ${mainIngredients.join(' ')}`
-      : `${dishName} 레시피`
+      ? `${dishName} ${recipeSuffix} ${mainIngredients.join(' ')}`
+      : `${dishName} ${recipeSuffix}`
 
     const response = await $fetch('/api/youtube/search', {
       query: {
@@ -149,17 +151,17 @@ function selectVideo(video: YouTubeVideo) {
   selectedVideo.value = video
 }
 
-function formatDate(dateString: string): string {
-  const date = new Date(dateString)
+function formatDate(dateStr: string) {
+  const date = new Date(dateStr)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
-  if (diffDays < 1) return '오늘'
-  if (diffDays < 7) return `${diffDays}일 전`
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}주 전`
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)}개월 전`
-  return `${Math.floor(diffDays / 365)}년 전`
+  if (diffDays < 1) return t('common.today')
+  if (diffDays < 7) return t('common.daysAgo', { count: diffDays })
+  if (diffDays < 30) return t('common.weeksAgo', { count: Math.floor(diffDays / 7) })
+  if (diffDays < 365) return t('common.monthsAgo', { count: Math.floor(diffDays / 30) })
+  return t('common.yearsAgo', { count: Math.floor(diffDays / 365) })
 }
 
 function goBack() {
@@ -187,12 +189,12 @@ watch(() => route.params.id, () => {
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
       </svg>
-      검색 결과로 돌아가기
+      {{ t('dishDetail.backToSearch') }}
     </button>
 
     <!-- 로딩 -->
     <div v-if="isLoadingDetail" class="text-center py-12 text-gray-500">
-      로딩 중...
+      {{ t('dishDetail.loading') }}
     </div>
 
     <!-- 상세 내용 -->
@@ -213,7 +215,7 @@ watch(() => route.params.id, () => {
 
       <!-- 필요한 재료 -->
       <section class="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 class="font-semibold text-gray-900 mb-4">필요한 재료</h2>
+        <h2 class="font-semibold text-gray-900 mb-4">{{ t('dishDetail.requiredIngredients') }}</h2>
         <div class="flex flex-wrap gap-2">
           <span
             v-for="ing in dishDetail.ingredients"
@@ -231,10 +233,10 @@ watch(() => route.params.id, () => {
 
       <!-- YouTube 레시피 영상 -->
       <section class="bg-white border border-gray-200 rounded-lg p-6">
-        <h2 class="font-semibold text-gray-900 mb-4">📺 레시피 영상</h2>
+        <h2 class="font-semibold text-gray-900 mb-4">{{ t('dishDetail.recipeVideos') }}</h2>
 
         <div v-if="isLoadingYoutube" class="text-center py-4 text-gray-500">
-          영상 검색 중...
+          {{ t('dishDetail.searchingVideos') }}
         </div>
 
         <div v-else-if="youtubeVideos.length > 0" class="space-y-4">
@@ -252,8 +254,8 @@ watch(() => route.params.id, () => {
               <svg class="w-16 h-16 mb-3" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8 5v14l11-7z"/>
               </svg>
-              <p class="text-base font-medium">영상을 선택하세요</p>
-              <p class="text-sm mt-1 opacity-70">아래 목록에서 시청할 영상을 클릭하세요</p>
+              <p class="text-base font-medium">{{ t('dishDetail.selectVideo') }}</p>
+              <p class="text-sm mt-1 opacity-70">{{ t('dishDetail.selectVideoHint') }}</p>
             </div>
           </div>
 
@@ -278,7 +280,7 @@ watch(() => route.params.id, () => {
                         : 'bg-gray-100 text-gray-600'
                   ]"
                 >
-                  재료 {{ selectedVideo.ingredientMatch.count }}/{{ selectedVideo.ingredientMatch.total }} 일치
+                  {{ t('dishDetail.ingredientMatch', { count: selectedVideo.ingredientMatch.count, total: selectedVideo.ingredientMatch.total }) }}
                   <span v-if="selectedVideo.transcriptStatus === 'done'" class="ml-1">✓</span>
                   <span v-else-if="selectedVideo.transcriptStatus === 'loading'" class="ml-1">🔄</span>
                 </span>
@@ -354,19 +356,19 @@ watch(() => route.params.id, () => {
                     'text-xs',
                     selectedVideo?.id === video.id ? 'text-gray-400' : 'text-gray-400'
                   ]">
-                    🔄 자막 검증 중...
+                    {{ t('dishDetail.verifyingTranscript') }}
                   </span>
                   <span v-else-if="video.transcriptStatus === 'done'" :class="[
                     'text-xs',
                     selectedVideo?.id === video.id ? 'text-green-300' : 'text-green-600'
                   ]">
-                    ✓ 자막 검증됨
+                    {{ t('dishDetail.transcriptVerified') }}
                   </span>
                   <span v-else-if="video.transcriptStatus === 'unavailable'" :class="[
                     'text-xs',
                     selectedVideo?.id === video.id ? 'text-gray-400' : 'text-gray-400'
                   ]">
-                    자막 없음
+                    {{ t('dishDetail.noTranscript') }}
                   </span>
                   <span v-else :class="[
                     'text-xs',
@@ -380,18 +382,18 @@ watch(() => route.params.id, () => {
           </div>
 
           <a
-            :href="`https://www.youtube.com/results?search_query=${encodeURIComponent(dishDetail.dish.name + ' 레시피')}`"
+            :href="`https://www.youtube.com/results?search_query=${encodeURIComponent(dishDetail.dish.name + (locale === 'en' ? ' recipe' : ' 레시피'))}`"
             target="_blank"
             rel="noopener noreferrer"
             class="block text-center text-sm text-gray-500 hover:text-gray-900 py-2"
           >
-            YouTube에서 더 보기 →
+            {{ t('dishDetail.moreOnYoutube') }} →
           </a>
         </div>
 
         <a
           v-else
-          :href="`https://www.youtube.com/results?search_query=${encodeURIComponent(dishDetail.dish.name + ' 레시피')}`"
+          :href="`https://www.youtube.com/results?search_query=${encodeURIComponent(dishDetail.dish.name + (locale === 'en' ? ' recipe' : ' 레시피'))}`"
           target="_blank"
           rel="noopener noreferrer"
           class="flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-lg p-4 transition-all"
@@ -402,8 +404,8 @@ watch(() => route.params.id, () => {
             </svg>
           </div>
           <div>
-            <p class="font-medium text-gray-900">"{{ dishDetail.dish.name }} 레시피" 검색</p>
-            <p class="text-sm text-gray-500">YouTube에서 영상 레시피 보기</p>
+            <p class="font-medium text-gray-900">{{ t('dishDetail.searchOnYoutube') }}</p>
+            <p class="text-sm text-gray-500">{{ t('dishDetail.watchOnYoutube') }}</p>
           </div>
         </a>
       </section>
@@ -412,9 +414,9 @@ watch(() => route.params.id, () => {
     <!-- 오류 -->
     <div v-else class="text-center py-16">
       <p class="text-5xl mb-4">😢</p>
-      <p class="text-gray-500">요리 정보를 불러올 수 없습니다</p>
+      <p class="text-gray-500">{{ t('dishDetail.loadError') }}</p>
       <button @click="goBack" class="mt-4 text-gray-900 font-medium hover:underline">
-        돌아가기
+        {{ t('dishDetail.goBack') }}
       </button>
     </div>
   </div>

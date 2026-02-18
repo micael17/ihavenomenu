@@ -22,10 +22,13 @@ interface UserIngredient {
   days_left?: number
 }
 
+const { t, locale } = useI18n()
 const { isLoggedIn } = useAuth()
 
 // 기본 재료 목록 (DB에서 가져옴)
-const { data: baseData } = await useFetch('/api/ingredients/base')
+const { data: baseData } = await useFetch('/api/ingredients/base', {
+  watch: [locale]
+})
 const categories = computed(() => baseData.value?.categories || [])
 const groupedIngredients = computed(() => baseData.value?.grouped || {} as Record<string, BaseIngredient[]>)
 
@@ -125,7 +128,7 @@ function isExpiringSoon(daysLeft: number | undefined) {
 const groupedUserIngredients = computed(() => {
   const groups: Record<string, UserIngredient[]> = {}
   for (const ing of userIngredients.value) {
-    const cat = ing.category || '기타'
+    const cat = ing.category || t('myFridge.other')
     if (!groups[cat]) groups[cat] = []
     groups[cat].push(ing)
   }
@@ -152,6 +155,13 @@ watch(isLoggedIn, (loggedIn) => {
     expiringIngredients.value = []
   }
 }, { immediate: true })
+
+// locale 변경 시 사용자 재료 리로드
+watch(locale, () => {
+  if (isLoggedIn.value) {
+    loadUserIngredients()
+  }
+})
 </script>
 
 <template>
@@ -165,14 +175,14 @@ watch(isLoggedIn, (loggedIn) => {
         <div class="flex-1">
           <div class="flex items-center justify-between mb-6">
             <div>
-              <h1 class="text-2xl font-semibold text-gray-900">내 재료</h1>
-              <p class="text-gray-500 mt-1">{{ userIngredients.length }}개의 재료를 보유중</p>
+              <h1 class="text-2xl font-semibold text-gray-900">{{ t('myFridge.title') }}</h1>
+              <p class="text-gray-500 mt-1">{{ t('myFridge.ingredientCount', { count: userIngredients.length }) }}</p>
             </div>
             <button
               @click="openAddModal"
               class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800"
             >
-              + 재료 추가
+              + {{ t('myFridge.addIngredient') }}
             </button>
           </div>
 
@@ -185,7 +195,7 @@ watch(isLoggedIn, (loggedIn) => {
               <div class="flex items-center gap-3">
                 <span class="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center text-sm">⏰</span>
                 <div>
-                  <p class="font-medium text-red-900">빨리 써야하는 재료</p>
+                  <p class="font-medium text-red-900">{{ t('myFridge.expiringAlert') }}</p>
                   <p class="text-sm text-red-700">
                     {{ expiringIngredients.map(i => `${i.name} (${getDaysLeftText(i.days_left)})`).join(', ') }}
                   </p>
@@ -195,25 +205,25 @@ watch(isLoggedIn, (loggedIn) => {
                 @click="searchRecipesWithIngredients(expiringIngredients)"
                 class="text-sm text-red-700 hover:text-red-900 font-medium"
               >
-                이 재료로 요리 찾기 →
+                {{ t('myFridge.searchWithIngredients') }} →
               </button>
             </div>
           </div>
 
           <!-- 로딩 상태 -->
           <div v-if="isLoadingIngredients" class="text-center py-12 text-gray-500">
-            로딩 중...
+            {{ t('common.loading') }}
           </div>
 
           <!-- 재료 없음 -->
           <div v-else-if="userIngredients.length === 0" class="text-center py-12 bg-white border border-gray-200 rounded-lg">
             <span class="text-4xl mb-4 block">🥬</span>
-            <p class="text-gray-500 mb-4">아직 등록한 재료가 없어요</p>
+            <p class="text-gray-500 mb-4">{{ t('myFridge.noIngredients') }}</p>
             <button
               @click="openAddModal"
               class="text-gray-900 font-medium hover:underline"
             >
-              재료 추가하기 →
+              {{ t('myFridge.addIngredientsLink') }} →
             </button>
           </div>
 
@@ -258,7 +268,7 @@ watch(isLoggedIn, (loggedIn) => {
         <aside class="w-80 flex-shrink-0">
           <div class="bg-white border border-gray-200 rounded-lg sticky top-8">
             <div class="px-4 py-3 border-b border-gray-100">
-              <h2 class="font-medium text-gray-900">빠른 메뉴</h2>
+              <h2 class="font-medium text-gray-900">{{ t('myFridge.quickMenu') }}</h2>
             </div>
             <div class="p-4 space-y-2">
               <button
@@ -271,13 +281,13 @@ watch(isLoggedIn, (loggedIn) => {
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 ]"
               >
-                🔍 내 재료로 요리 찾기
+                🔍 {{ t('myFridge.searchWithMyIngredients') }}
               </button>
               <NuxtLink
                 to="/"
                 class="block w-full py-3 px-4 bg-gray-50 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
               >
-                🍳 레시피 검색
+                🍳 {{ t('dashboard.searchRecipes') }}
               </NuxtLink>
             </div>
           </div>
@@ -295,7 +305,7 @@ watch(isLoggedIn, (loggedIn) => {
         <div class="bg-white w-full max-w-lg rounded-lg max-h-[80vh] overflow-hidden flex flex-col">
           <!-- 헤더 -->
           <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-            <h2 class="font-semibold text-lg text-gray-900">재료 추가</h2>
+            <h2 class="font-semibold text-lg text-gray-900">{{ t('myFridge.addIngredientModal') }}</h2>
             <button @click="closeAddModal" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500">
               ✕
             </button>
@@ -314,14 +324,14 @@ watch(isLoggedIn, (loggedIn) => {
                   @click="selectedIngredientToAdd = null"
                   class="text-sm text-gray-500 hover:text-gray-700"
                 >
-                  변경
+                  {{ t('myFridge.changeIngredient') }}
                 </button>
               </div>
 
               <!-- 유통기한 입력 (선택) -->
               <div class="mt-4">
                 <label class="block text-sm text-gray-600 mb-2">
-                  유통기한 <span class="text-gray-400">(선택)</span>
+                  {{ t('myFridge.expiryDateLabel') }} <span class="text-gray-400">{{ t('myFridge.expiryDateOptional') }}</span>
                 </label>
                 <input
                   v-model="expiryDateInput"
@@ -369,7 +379,7 @@ watch(isLoggedIn, (loggedIn) => {
                 </button>
               </div>
               <p v-else class="text-sm text-gray-400 text-center py-4">
-                카테고리를 선택해주세요
+                {{ t('myFridge.selectCategory') }}
               </p>
             </div>
           </div>
@@ -380,7 +390,7 @@ watch(isLoggedIn, (loggedIn) => {
               @click="addIngredient"
               class="w-full py-3 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800"
             >
-              추가하기
+              {{ t('myFridge.addButton') }}
             </button>
           </div>
         </div>

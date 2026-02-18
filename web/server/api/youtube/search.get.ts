@@ -1,12 +1,18 @@
+import { getLocale } from '../../utils/locale'
+
 export default defineEventHandler(async (event) => {
+  requireAuth(event)
+  checkRateLimit(event, { maxRequests: 10, windowMs: 60000 })
+
   const query = getQuery(event)
   const searchQuery = query.q as string
   const ingredients = (query.ingredients as string)?.split(',').map(i => i.trim().toLowerCase()) || []
+  const locale = getLocale(event)
 
-  if (!searchQuery) {
+  if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.length > 200) {
     throw createError({
       statusCode: 400,
-      message: 'Search query required'
+      message: 'Valid search query required (max 200 characters)'
     })
   }
 
@@ -18,20 +24,22 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const youtubeQuery: Record<string, any> = {
+      part: 'snippet',
+      q: searchQuery,
+      type: 'video',
+      maxResults: 10,
+      order: 'viewCount',
+      key: apiKey,
+      relevanceLanguage: locale === 'en' ? 'en' : 'ko',
+    }
+    if (locale === 'ko') {
+      youtubeQuery.regionCode = 'KR'
+    }
+
     const response = await $fetch<any>(
       'https://www.googleapis.com/youtube/v3/search',
-      {
-        query: {
-          part: 'snippet',
-          q: searchQuery,
-          type: 'video',
-          maxResults: 10,
-          order: 'viewCount',
-          key: apiKey,
-          relevanceLanguage: 'ko',
-          regionCode: 'KR'
-        }
-      }
+      { query: youtubeQuery }
     )
 
     const videos = response.items?.map((item: any) => {
@@ -64,6 +72,6 @@ export default defineEventHandler(async (event) => {
     return { videos, hasApiKey: true, ingredients }
   } catch (error: any) {
     console.error('YouTube API error:', error)
-    return { videos: [], hasApiKey: true, error: error.message }
+    return { videos: [], hasApiKey: true, error: 'YouTube search failed' }
   }
 })
