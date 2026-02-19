@@ -133,8 +133,12 @@
     "noDishesFound": "요리를 찾을 수 없습니다",
     "loadingMore": "더 불러오는 중...",
     "allRecipesLoaded": "모든 레시피를 불러왔습니다",
+    "creatorRecipes": "크리에이터 레시피",
+    "creatorRecipeCount": "{count}개",
     "creatorBadge": "크리에이터",
-    "matchCount": "일치 {match}/{total}"
+    "matchCount": "내 재료 {match}/{total} 일치",
+    "rateLimitTitle": "요청이 너무 많습니다",
+    "rateLimitMessage": "잠시 후 다시 시도해주세요. 아래 표시된 레시피는 계속 볼 수 있습니다."
   },
   "recipe": {
     "recipe": "레시피",
@@ -168,9 +172,21 @@
     "category": "카테고리",
     "categoryItems": "{category} 재료",
     "selectCategoryHint": "카테고리를 선택해주세요",
+    "searchPlaceholder": "재료 이름으로 검색...",
+    "searchResultCount": "{count}개 결과",
+    "noSearchResults": "검색 결과가 없습니다",
     "cuisineLabel": "레시피 스타일",
-    "cuisineKorean": "🇰🇷 한식 우선",
-    "cuisineMixed": "🌎 골고루"
+    "cuisineKorean": "🇰🇷 한식",
+    "cuisineMixed": "🌎 골고루",
+    "cuisineWestern": "🍝 양식",
+    "cuisineDessert": "🍰 디저트",
+    "subKoreanSide": "밑반찬",
+    "subKoreanMain": "메인반찬",
+    "subKoreanSoup": "국/탕",
+    "subKoreanStew": "찌개",
+    "subKoreanRice": "밥/죽/떡",
+    "subKoreanNoodle": "면/만두",
+    "subKoreanKimchi": "김치/젓갈/장류"
   },
   "nav": {
     "home": "홈",

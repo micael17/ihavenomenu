@@ -5,8 +5,12 @@
 -- 재료 테이블
 CREATE TABLE IF NOT EXISTS ingredients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,           -- 재료명 (예: 미역, 소고기)
-    category TEXT,                        -- 분류 (예: 해물류, 육류, 채소류)
+    name TEXT NOT NULL UNIQUE,           -- 재료명 (원본)
+    name_ko TEXT,                         -- 한글 재료명
+    name_en TEXT,                         -- 영문 재료명
+    category TEXT,                        -- 분류 (원본)
+    category_ko TEXT,                     -- 한글 분류
+    category_en TEXT,                     -- 영문 분류
     parent_id INTEGER,                    -- 상위 재료 (예: 다진소고기 → 소고기)
     is_base BOOLEAN DEFAULT 0,            -- 기본 재료 여부 (검색용)
     aliases TEXT,                         -- 다른 이름들 JSON (예: ["쇠고기", "한우"])
@@ -63,6 +67,8 @@ CREATE TABLE IF NOT EXISTS recipes (
 -- =============================================
 
 CREATE INDEX IF NOT EXISTS idx_ingredients_name ON ingredients(name);
+CREATE INDEX IF NOT EXISTS idx_ingredients_name_ko ON ingredients(name_ko);
+CREATE INDEX IF NOT EXISTS idx_ingredients_name_en ON ingredients(name_en);
 CREATE INDEX IF NOT EXISTS idx_ingredients_category ON ingredients(category);
 CREATE INDEX IF NOT EXISTS idx_ingredients_parent ON ingredients(parent_id);
 CREATE INDEX IF NOT EXISTS idx_ingredients_base ON ingredients(is_base);

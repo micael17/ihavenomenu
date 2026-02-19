@@ -35,9 +35,9 @@ async function loadRecommendations() {
       todayRecommendations.value = []
       return
     }
-    const names = userIngredients.value.map((i: any) => i.name).join(',')
+    const ids = userIngredients.value.map((i: any) => i.ingredient_id).join(',')
     const response = await $fetch<{ dishes: any[] }>('/api/dishes/search', {
-      query: { ingredients: names, limit: 4 }
+      query: { ids, limit: 4 }
     })
     todayRecommendations.value = response.dishes
   } catch (e) {

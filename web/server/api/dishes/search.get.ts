@@ -1,40 +1,43 @@
 import { useDB, type DishWithIngredients } from '../../utils/db'
 import { getLocale } from '../../utils/locale'
 
-const PAGE_SIZE = 12
+const PAGE_SIZE = 24
 const MAX_LIMIT = 50
 
 export default defineEventHandler(async (event) => {
-  checkRateLimit(event, { maxRequests: 30, windowMs: 60000 })
+  checkRateLimit(event, { maxRequests: 60, windowMs: 60000 })
 
   const query = getQuery(event)
-  const ingredientNames = (query.ingredients as string || '').split(',').filter(Boolean)
+  const ingredientIds = (query.ids as string || '').split(',').filter(Boolean).map(Number).filter(id => !isNaN(id) && id > 0)
   const offset = Math.max(0, parseInt(query.offset as string) || 0)
   const limit = Math.min(Math.max(1, parseInt(query.limit as string) || PAGE_SIZE), MAX_LIMIT)
   const cuisine = (query.cuisine as string) || 'mixed'
+  const subCategory = (query.subCategory as string) || ''
   const locale = getLocale(event)
 
-  if (ingredientNames.length === 0) {
-    return { dishes: [], total: 0, hasMore: false }
+  if (ingredientIds.length === 0) {
+    return { userDishes: [], dbDishes: [], total: 0, dbTotal: 0, hasMore: false }
   }
 
   try {
     const db = useDB()
 
-    // 1. 입력된 재료명으로 기본 재료 ID 찾기 (name + aliases 양쪽 체크)
-    const ingredientPlaceholders = ingredientNames.map(() => '?').join(',')
-    const aliasConditions = ingredientNames.map(() => `json_extract(aliases, '$[0]') = ? COLLATE NOCASE`).join(' OR ')
-
+    // 1. 전달받은 ID → base 재료 ID로 해석
+    //    is_base=1이면 그대로, is_base=0이면 같은 name_ko를 가진 base 재료로 매핑
+    const idPlaceholdersInput = ingredientIds.map(() => '?').join(',')
     const baseIngredientSQL = `
-      SELECT id FROM ingredients
-      WHERE is_base = 1 AND (name IN (${ingredientPlaceholders}) OR ${aliasConditions})
+      SELECT DISTINCT COALESCE(base.id, a.id) as id
+      FROM ingredients a
+      LEFT JOIN ingredients base ON a.name_ko = base.name_ko AND base.is_base = 1 AND a.is_base = 0
+      WHERE a.id IN (${idPlaceholdersInput})
+        AND (a.is_base = 1 OR base.id IS NOT NULL)
     `
     const baseIds = db.prepare(baseIngredientSQL)
-      .all(...ingredientNames, ...ingredientNames)
+      .all(...ingredientIds)
       .map((row: any) => row.id)
 
     if (baseIds.length === 0) {
-      return { dishes: [], total: 0, hasMore: false, searched_ingredients: ingredientNames }
+      return { userDishes: [], dbDishes: [], total: 0, dbTotal: 0, hasMore: false }
     }
 
     // 2. 기본 재료 + 그 하위 재료들의 ID 모으기
@@ -58,7 +61,7 @@ export default defineEventHandler(async (event) => {
       description: recipe.description,
       ingredients: '',
       match_count: recipe.match_count,
-      total_count: recipe.total_ingredients,
+      total_count: baseIds.length,
       isUserRecipe: true,
       creator: {
         nickname: recipe.nickname,
@@ -70,7 +73,22 @@ export default defineEventHandler(async (event) => {
       likeCount: recipe.like_count
     }))
 
-    // 4. DB 레시피 총 개수 조회
+    // 4. 스타일별 카테고리 필터 매핑
+    const cuisineCategoryMap: Record<string, string[]> = {
+      korean: ['밑반찬', '메인반찬', '밥/죽/떡', '국/탕', '찌개', '김치/젓갈/장류', '면/만두'],
+      western: ['양식', 'Main', 'Side Dish', '스프', '샐러드'],
+      dessert: ['디저트', 'Dessert', '빵', '과자']
+    }
+    // subCategory가 있으면 해당 카테고리 1개로 필터, 없으면 cuisine 그룹 전체
+    const cuisineCategories = subCategory
+      ? [subCategory]
+      : (cuisineCategoryMap[cuisine] || null)
+    const cuisineFilter = cuisineCategories
+      ? `AND d.category IN (${cuisineCategories.map(() => '?').join(',')})`
+      : ''
+    const cuisineParams = cuisineCategories || []
+
+    // 5. DB 레시피 총 개수 조회
     const idPlaceholders = allIngredientIds.map(() => '?').join(',')
 
     const countSQL = `
@@ -78,88 +96,68 @@ export default defineEventHandler(async (event) => {
       FROM dishes d
       INNER JOIN dish_ingredients di ON d.id = di.dish_id
       WHERE di.ingredient_id IN (${idPlaceholders})
+        ${cuisineFilter}
     `
-    const countResult = db.prepare(countSQL).get(...allIngredientIds) as { count: number }
+    const countResult = db.prepare(countSQL).get(...allIngredientIds, ...cuisineParams) as { count: number }
     const totalDbCount = countResult.count
 
-    // 5. DB 레시피 검색 (페이지네이션 적용)
-    // 사용자 레시피 개수를 고려하여 offset 조정
-    const userRecipeCount = userDishes.length
-    let dbOffset = 0
-    let dbLimit = limit
-    let userSlice: typeof userDishes = []
+    // 6. DB 레시피 검색 (페이지네이션은 DB 레시피에만 적용)
+    const dishNameField = locale === 'en'
+      ? `COALESCE(d.name_en, d.name) as name`
+      : `d.name`
+    const ingredientNameField = locale === 'en'
+      ? `COALESCE(json_extract(i.aliases, '$[0]'), i.name)`
+      : `i.name`
 
-    if (offset < userRecipeCount) {
-      // 아직 사용자 레시피 범위 내
-      userSlice = userDishes.slice(offset, offset + limit)
-      dbLimit = limit - userSlice.length
-      dbOffset = 0
-    } else {
-      // 사용자 레시피 범위를 벗어남
-      dbOffset = offset - userRecipeCount
-    }
+    const baseIdPlaceholdersForMatch = baseIds.map(() => '?').join(',')
 
-    let dbDishesWithFlag: any[] = []
+    const searchSQL = `
+      SELECT
+        d.id,
+        ${dishNameField},
+        d.category,
+        d.image_url,
+        d.description,
+        GROUP_CONCAT(DISTINCT ${ingredientNameField}) as ingredients,
+        COUNT(DISTINCT CASE
+          WHEN di.ingredient_id IN (${idPlaceholders}) THEN
+            CASE WHEN i.parent_id IN (${baseIdPlaceholdersForMatch}) THEN i.parent_id ELSE i.id END
+        END) as match_count,
+        COUNT(DISTINCT di.ingredient_id) as dish_ingredient_count
+      FROM dishes d
+      INNER JOIN dish_ingredients di ON d.id = di.dish_id
+      INNER JOIN ingredients i ON di.ingredient_id = i.id
+      WHERE d.id IN (
+        SELECT DISTINCT dish_id
+        FROM dish_ingredients
+        WHERE ingredient_id IN (${idPlaceholders})
+      )
+        ${cuisineFilter}
+      GROUP BY d.id
+      ORDER BY match_count DESC, dish_ingredient_count ASC
+      LIMIT ? OFFSET ?
+    `
 
-    if (dbLimit > 0) {
-      // korean: 한글 카테고리(한식) 우선, mixed: 매칭도만 기준
-      const cuisineOrder = cuisine === 'korean'
-        ? `CASE WHEN d.category GLOB '*[가-힣]*' THEN 0 ELSE 1 END ASC,`
-        : ''
+    const dbDishes = db.prepare(searchSQL)
+      .all(...allIngredientIds, ...baseIds, ...allIngredientIds, ...cuisineParams, limit, offset) as DishWithIngredients[]
 
-      const dishNameField = locale === 'en'
-        ? `COALESCE(d.name_en, d.name) as name`
-        : `d.name`
-      const ingredientNameField = locale === 'en'
-        ? `COALESCE(json_extract(i.aliases, '$[0]'), i.name)`
-        : `i.name`
+    const dbDishesWithFlag = dbDishes.map(dish => ({
+      ...dish,
+      total_count: baseIds.length,
+      ingredients: dish.ingredients ? dish.ingredients.replace(/[\x00-\x1F\x7F]/g, ' ').trim() : '',
+      isUserRecipe: false
+    }))
 
-      const searchSQL = `
-        SELECT
-          d.id,
-          ${dishNameField},
-          d.category,
-          d.image_url,
-          d.description,
-          GROUP_CONCAT(DISTINCT ${ingredientNameField}) as ingredients,
-          COUNT(DISTINCT CASE WHEN di.ingredient_id IN (${idPlaceholders}) THEN di.ingredient_id END) as match_count,
-          COUNT(DISTINCT di.ingredient_id) as total_count
-        FROM dishes d
-        INNER JOIN dish_ingredients di ON d.id = di.dish_id
-        INNER JOIN ingredients i ON di.ingredient_id = i.id
-        WHERE d.id IN (
-          SELECT DISTINCT dish_id
-          FROM dish_ingredients
-          WHERE ingredient_id IN (${idPlaceholders})
-        )
-        GROUP BY d.id
-        ORDER BY ${cuisineOrder} match_count DESC, total_count ASC
-        LIMIT ? OFFSET ?
-      `
-
-      const dbDishes = db.prepare(searchSQL)
-        .all(...allIngredientIds, ...allIngredientIds, dbLimit, dbOffset) as DishWithIngredients[]
-
-      dbDishesWithFlag = dbDishes.map(dish => ({
-        ...dish,
-        ingredients: dish.ingredients ? dish.ingredients.replace(/[\x00-\x1F\x7F]/g, ' ').trim() : '',
-        isUserRecipe: false
-      }))
-    }
-
-    // 6. 결과 합치기
-    const dishes = [...userSlice, ...dbDishesWithFlag]
-    const totalCount = userRecipeCount + totalDbCount
-    const hasMore = offset + dishes.length < totalCount
+    const hasMore = offset + dbDishesWithFlag.length < totalDbCount
 
     return {
-      dishes,
-      total: totalCount,
+      userDishes,
+      dbDishes: dbDishesWithFlag,
+      total: userDishes.length + totalDbCount,
+      dbTotal: totalDbCount,
       hasMore,
       offset,
-      userRecipeCount,
-      dbRecipeCount: totalDbCount,
-      searched_ingredients: ingredientNames
+      searched_ids: ingredientIds
     }
   } catch (error) {
     console.error('Search error:', error)

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Ingredient } from '~/composables/useRecipeSearch'
 
-const { myIngredients, selectedIngredients, excludedMyIngredientIds, cuisinePreference, loadUserIngredients, toggleExcludeMyIngredient, setIngredientsFromNames } = useRecipeSearch()
+const { myIngredients, selectedIngredients, excludedMyIngredientIds, cuisinePreference, cuisineSubCategory, loadUserIngredients, toggleExcludeMyIngredient, setIngredientsFromNames } = useRecipeSearch()
 
 const route = useRoute()
 
@@ -32,9 +32,10 @@ onMounted(async () => {
           <RecipeIngredientSelector
             v-model="selectedIngredients"
             v-model:cuisine="cuisinePreference"
+            v-model:sub-category="cuisineSubCategory"
             :my-ingredients="myIngredients"
             :excluded-ids="excludedMyIngredientIds"
-            @toggle-exclude="toggleExcludeMyIngredient"
+            @toggle-exclude="(ing) => toggleExcludeMyIngredient(ing.id)"
           />
         </div>
 

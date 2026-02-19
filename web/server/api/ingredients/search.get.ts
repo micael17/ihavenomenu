@@ -36,25 +36,26 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // 검색어 (LIKE 와일드카드 이스케이프)
+  // 검색어
   const searchTerm = q
   const prefixPattern = `${sanitized}%`
   const containsPattern = `%${sanitized}%`
 
-  const nameField = locale === 'en'
-    ? `COALESCE(json_extract(aliases, '$[0]'), name) as name`
-    : `name`
-  const categoryField = locale === 'en'
-    ? `COALESCE(category_en, category) as category`
-    : `category`
+  // locale에 따라 적절한 필드 선택
+  const nameField = locale === 'ko'
+    ? 'COALESCE(name_ko, name) as name'
+    : 'COALESCE(name_en, name) as name'
+  const categoryField = locale === 'ko'
+    ? 'COALESCE(category_ko, category) as category'
+    : 'COALESCE(category_en, category) as category'
 
-  // 검색 쿼리 - 우선순위에 따라 정렬
+  // 검색 필드: name_ko, name_en, 또는 aliases 모두 검색
   const sql = `
     SELECT
       id, ${nameField}, ${categoryField}, is_base,
       CASE
-        WHEN name = ? THEN 'exact'
-        WHEN name LIKE ? THEN 'prefix'
+        WHEN name_ko = ? OR name_en = ? THEN 'exact'
+        WHEN name_ko LIKE ? OR name_en LIKE ? THEN 'prefix'
         WHEN aliases LIKE ? THEN 'alias'
         ELSE 'contains'
       END as match_type
@@ -62,33 +63,40 @@ export default defineEventHandler(async (event) => {
     WHERE is_base = 1
       ${categoryFilter}
       AND (
-        name = ?
-        OR name LIKE ?
+        name_ko = ?
+        OR name_en = ?
+        OR name_ko LIKE ?
+        OR name_en LIKE ?
         OR aliases LIKE ?
-        OR name LIKE ?
+        OR name_ko LIKE ?
+        OR name_en LIKE ?
       )
     ORDER BY
       CASE
-        WHEN name = ? THEN 1
-        WHEN name LIKE ? THEN 2
+        WHEN name_ko = ? OR name_en = ? THEN 1
+        WHEN name_ko LIKE ? OR name_en LIKE ? THEN 2
         WHEN aliases LIKE ? THEN 3
         ELSE 4
       END,
-      length(name),
-      name
+      CASE WHEN name_ko IS NOT NULL THEN length(name_ko) ELSE length(name_en) END,
+      COALESCE(name_ko, name_en)
     LIMIT 10
   `
 
   // 파라미터 순서:
-  // CASE (3개): exact, prefix, alias
+  // CASE (5개): exact(2), prefix(2), alias(1)
   // 카테고리 필터 (가변)
-  // WHERE (4개): exact, prefix, alias, contains
-  // ORDER BY CASE (3개): exact, prefix, alias
+  // WHERE (7개): exact(2), prefix(2), alias(1), contains(2)
+  // ORDER BY CASE (5개): exact(2), prefix(2), alias(1)
   const allParams = [
-    searchTerm, prefixPattern, containsPattern, // CASE
-    ...categoryParams, // 카테고리 필터
-    searchTerm, prefixPattern, containsPattern, containsPattern, // WHERE
-    searchTerm, prefixPattern, containsPattern // ORDER BY
+    // CASE
+    searchTerm, searchTerm, prefixPattern, prefixPattern, containsPattern,
+    // 카테고리 필터
+    ...categoryParams,
+    // WHERE
+    searchTerm, searchTerm, prefixPattern, prefixPattern, containsPattern, containsPattern, containsPattern,
+    // ORDER BY
+    searchTerm, searchTerm, prefixPattern, prefixPattern, containsPattern
   ]
 
   const results = db.prepare(sql).all(...allParams) as SearchResult[]

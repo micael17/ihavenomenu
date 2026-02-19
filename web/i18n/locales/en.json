@@ -133,8 +133,12 @@
     "noDishesFound": "No dishes found",
     "loadingMore": "Loading more...",
     "allRecipesLoaded": "All recipes loaded",
+    "creatorRecipes": "Creator Recipes",
+    "creatorRecipeCount": "{count} recipes",
     "creatorBadge": "Creator",
-    "matchCount": "Match {match}/{total}"
+    "matchCount": "{match}/{total} matched",
+    "rateLimitTitle": "Too many requests",
+    "rateLimitMessage": "Please wait a moment. You can still browse the recipes shown below."
   },
   "recipe": {
     "recipe": "Recipe",
@@ -168,9 +172,21 @@
     "category": "Category",
     "categoryItems": "{category} items",
     "selectCategoryHint": "Please select a category",
+    "searchPlaceholder": "Search by ingredient name...",
+    "searchResultCount": "{count} results",
+    "noSearchResults": "No results found",
     "cuisineLabel": "Recipe Style",
-    "cuisineKorean": "🇰🇷 Korean First",
-    "cuisineMixed": "🌎 Mixed"
+    "cuisineKorean": "🇰🇷 Korean",
+    "cuisineMixed": "🌎 All",
+    "cuisineWestern": "🍝 Western",
+    "cuisineDessert": "🍰 Dessert",
+    "subKoreanSide": "Side Dish",
+    "subKoreanMain": "Main Dish",
+    "subKoreanSoup": "Soup",
+    "subKoreanStew": "Stew",
+    "subKoreanRice": "Rice/Porridge",
+    "subKoreanNoodle": "Noodle/Dumpling",
+    "subKoreanKimchi": "Kimchi/Fermented"
   },
   "nav": {
     "home": "Home",

@@ -13,6 +13,7 @@ export function useUserDB(): Database.Database {
 
   userDb = new Database(dbPath, { readonly: false })
   userDb.pragma('journal_mode = WAL')
+  userDb.pragma('busy_timeout = 5000')
 
   // 사용자 테이블 초기화
   initUserTables(userDb)
@@ -394,11 +395,11 @@ export function getUserPreferences(userId: number) {
 export function getUserIngredients(userId: number, locale: 'en' | 'ko' = 'ko') {
   const db = useUserDB()
   const nameField = locale === 'en'
-    ? `COALESCE(json_extract(i.aliases, '$[0]'), i.name) as name`
-    : `i.name`
+    ? `COALESCE(i.name_en, i.name) as name`
+    : `COALESCE(i.name_ko, i.name) as name`
   const categoryField = locale === 'en'
     ? `COALESCE(i.category_en, i.category) as category`
-    : `i.category`
+    : `COALESCE(i.category_ko, i.category) as category`
 
   return db.prepare(`
     SELECT ui.*, ${nameField}, ${categoryField}
@@ -451,11 +452,11 @@ export function updateUserIngredientExpiry(userId: number, ingredientId: number,
 export function getExpiringIngredients(userId: number, locale: 'en' | 'ko' = 'ko') {
   const db = useUserDB()
   const nameField = locale === 'en'
-    ? `COALESCE(json_extract(i.aliases, '$[0]'), i.name) as name`
-    : `i.name`
+    ? `COALESCE(i.name_en, i.name) as name`
+    : `COALESCE(i.name_ko, i.name) as name`
   const categoryField = locale === 'en'
     ? `COALESCE(i.category_en, i.category) as category`
-    : `i.category`
+    : `COALESCE(i.category_ko, i.category) as category`
 
   return db.prepare(`
     SELECT ui.*, ${nameField}, ${categoryField},
@@ -664,12 +665,15 @@ export function searchUserRecipesByIngredients(ingredientIds: number[]) {
       c.youtube_channel_url,
       u.nickname,
       u.profile_image,
-      COUNT(DISTINCT uri.ingredient_id) as match_count,
+      COUNT(DISTINCT CASE
+        WHEN ing.parent_id IS NOT NULL THEN ing.parent_id ELSE ing.id
+      END) as match_count,
       (SELECT COUNT(*) FROM user_recipe_ingredients WHERE recipe_id = ur.id) as total_ingredients
     FROM user_recipes ur
     JOIN creators c ON ur.creator_id = c.id
     JOIN users u ON c.user_id = u.id
     JOIN user_recipe_ingredients uri ON ur.id = uri.recipe_id
+    JOIN ingredients ing ON uri.ingredient_id = ing.id
     WHERE ur.status = 'published'
       AND uri.ingredient_id IN (${placeholders})
     GROUP BY ur.id

@@ -11,6 +11,7 @@ export interface Ingredient {
 
 const model = defineModel<Ingredient[]>({ default: () => [] })
 const cuisineModel = defineModel<CuisinePreference>('cuisine', { default: 'mixed' })
+const subCategoryModel = defineModel<string | null>('subCategory', { default: null })
 
 const props = defineProps<{
   myIngredients?: Ingredient[]
@@ -21,7 +22,43 @@ const emit = defineEmits<{
   toggleExclude: [ingredient: Ingredient]
 }>()
 
+const cuisineOptions = computed(() => [
+  { value: 'mixed' as CuisinePreference, label: t('ingredient.cuisineMixed') },
+  { value: 'western' as CuisinePreference, label: t('ingredient.cuisineWestern') },
+  { value: 'dessert' as CuisinePreference, label: t('ingredient.cuisineDessert') },
+  { value: 'korean' as CuisinePreference, label: t('ingredient.cuisineKorean') }
+])
+
+const subCategoryMap: Record<string, { value: string; labelKey: string }[]> = {
+  korean: [
+    { value: '밑반찬', labelKey: 'ingredient.subKoreanSide' },
+    { value: '메인반찬', labelKey: 'ingredient.subKoreanMain' },
+    { value: '국/탕', labelKey: 'ingredient.subKoreanSoup' },
+    { value: '찌개', labelKey: 'ingredient.subKoreanStew' },
+    { value: '밥/죽/떡', labelKey: 'ingredient.subKoreanRice' },
+    { value: '면/만두', labelKey: 'ingredient.subKoreanNoodle' },
+    { value: '김치/젓갈/장류', labelKey: 'ingredient.subKoreanKimchi' }
+  ]
+}
+
+const currentSubCategories = computed(() => subCategoryMap[cuisineModel.value] || [])
+
+function selectCuisine(value: CuisinePreference) {
+  if (cuisineModel.value !== value) {
+    subCategoryModel.value = null
+  }
+  cuisineModel.value = value
+}
+
+function toggleSubCategory(value: string) {
+  subCategoryModel.value = subCategoryModel.value === value ? null : value
+}
+
 const activeCategory = ref<string | null>(null)
+const searchQuery = ref('')
+const searchResults = ref<Ingredient[]>([])
+const isSearchingIngredients = ref(false)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const { data: baseData } = await useFetch('/api/ingredients/base', {
   watch: [locale]
@@ -34,6 +71,42 @@ const filteredIngredients = computed(() => {
   if (!activeCategory.value) return []
   return groupedIngredients.value[activeCategory.value] || []
 })
+
+const isSearchActive = computed(() => searchQuery.value.trim().length > 0)
+
+async function doIngredientSearch(q: string) {
+  const trimmed = q.trim()
+  if (!trimmed) {
+    searchResults.value = []
+    isSearchingIngredients.value = false
+    return
+  }
+
+  isSearchingIngredients.value = true
+  try {
+    const response = await $fetch<{ results: Ingredient[] }>('/api/ingredients/search', {
+      query: { q: trimmed }
+    })
+    searchResults.value = response.results || []
+  } catch {
+    searchResults.value = []
+  } finally {
+    isSearchingIngredients.value = false
+  }
+}
+
+function onSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    doIngredientSearch(searchQuery.value)
+  }, 250)
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+  searchResults.value = []
+  if (searchTimer) clearTimeout(searchTimer)
+}
 
 // 내 재료인지 확인
 function isMyIngredient(ingredient: Ingredient) {
@@ -86,28 +159,35 @@ function toggleExcludeMyIngredient(ingredient: Ingredient) {
     <!-- 레시피 스타일 -->
     <div class="px-4 py-3 border-b border-gray-100">
       <p class="text-xs font-medium text-gray-500 mb-2">{{ t('ingredient.cuisineLabel') }}</p>
-      <div class="flex rounded-lg border border-gray-200 overflow-hidden">
+      <div class="flex flex-wrap gap-1.5">
         <button
-          @click="cuisineModel = 'korean'"
+          v-for="option in cuisineOptions"
+          :key="option.value"
+          @click="selectCuisine(option.value)"
           :class="[
-            'flex-1 py-1.5 text-sm font-medium transition-colors',
-            cuisineModel === 'korean'
-              ? 'bg-gray-900 text-white'
-              : 'bg-white text-gray-500 hover:bg-gray-50'
+            'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors border',
+            cuisineModel === option.value
+              ? 'bg-gray-900 text-white border-gray-900'
+              : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
           ]"
         >
-          {{ t('ingredient.cuisineKorean') }}
+          {{ option.label }}
         </button>
+      </div>
+      <!-- 세부 카테고리 -->
+      <div v-if="currentSubCategories.length > 0" class="flex flex-wrap gap-1 mt-2">
         <button
-          @click="cuisineModel = 'mixed'"
+          v-for="sub in currentSubCategories"
+          :key="sub.value"
+          @click="toggleSubCategory(sub.value)"
           :class="[
-            'flex-1 py-1.5 text-sm font-medium transition-colors',
-            cuisineModel === 'mixed'
-              ? 'bg-gray-900 text-white'
-              : 'bg-white text-gray-500 hover:bg-gray-50'
+            'px-2 py-1 text-xs rounded-md transition-colors border',
+            subCategoryModel === sub.value
+              ? 'bg-gray-700 text-white border-gray-700'
+              : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
           ]"
         >
-          {{ t('ingredient.cuisineMixed') }}
+          {{ t(sub.labelKey) }}
         </button>
       </div>
     </div>
@@ -151,51 +231,114 @@ function toggleExcludeMyIngredient(ingredient: Ingredient) {
       </div>
     </div>
 
-    <!-- 카테고리 탭 -->
+    <!-- 재료 검색 -->
     <div class="px-4 py-3 border-b border-gray-100">
-      <p class="text-xs font-medium text-gray-500 mb-2">{{ t('ingredient.category') }}</p>
-      <div class="flex flex-wrap gap-1.5">
+      <div class="relative">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input
+          v-model="searchQuery"
+          @input="onSearchInput"
+          type="text"
+          :placeholder="t('ingredient.searchPlaceholder')"
+          class="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+        />
         <button
-          v-for="category in categories"
-          :key="category"
-          @click="activeCategory = activeCategory === category ? null : category"
-          :class="[
-            'px-3 py-1.5 text-sm rounded-lg transition-colors border',
-            activeCategory === category
-              ? 'bg-gray-900 text-white border-gray-900'
-              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-          ]"
+          v-if="searchQuery"
+          @click="clearSearch"
+          class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
         >
-          {{ category }}
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
       </div>
     </div>
 
-    <!-- 카테고리 내 재료 -->
-    <div class="p-4 max-h-96 overflow-y-auto">
-      <p v-if="activeCategory" class="text-xs font-medium text-gray-500 mb-2">{{ t('ingredient.categoryItems', { category: activeCategory }) }}</p>
-      <div v-if="activeCategory" class="flex flex-wrap gap-1.5">
-        <button
-          v-for="ing in filteredIngredients"
-          :key="ing.id"
-          @click="toggleIngredient(ing)"
-          :class="[
-            'px-3 py-1.5 text-sm rounded-lg transition-colors',
-            isMyIngredient(ing)
-              ? isExcluded(ing.id)
-                ? 'bg-gray-200 text-gray-400 line-through'
-                : 'bg-emerald-600 text-white'
-              : isSelected(ing)
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          ]"
-        >
-          {{ ing.name }}
-        </button>
+    <!-- 검색 결과 (검색 활성 시) -->
+    <template v-if="isSearchActive">
+      <div class="p-4 max-h-96 overflow-y-auto">
+        <div v-if="isSearchingIngredients" class="text-center py-4">
+          <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600"></div>
+        </div>
+        <div v-else-if="searchResults.length > 0">
+          <p class="text-xs text-gray-500 mb-2">{{ t('ingredient.searchResultCount', { count: searchResults.length }) }}</p>
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              v-for="ing in searchResults"
+              :key="ing.id"
+              @click="toggleIngredient(ing)"
+              :class="[
+                'px-3 py-1.5 text-sm rounded-lg transition-colors',
+                isMyIngredient(ing)
+                  ? isExcluded(ing.id)
+                    ? 'bg-gray-200 text-gray-400 line-through'
+                    : 'bg-emerald-600 text-white'
+                  : isSelected(ing)
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ]"
+            >
+              <span>{{ ing.name }}</span>
+              <span v-if="ing.category" class="text-[10px] opacity-60 ml-1">{{ ing.category }}</span>
+            </button>
+          </div>
+        </div>
+        <p v-else class="text-sm text-gray-400 text-center py-4">
+          {{ t('ingredient.noSearchResults') }}
+        </p>
       </div>
-      <p v-else class="text-sm text-gray-400 text-center py-4">
-        {{ t('ingredient.selectCategoryHint') }}
-      </p>
-    </div>
+    </template>
+
+    <!-- 카테고리 브라우저 (검색 비활성 시) -->
+    <template v-else>
+      <!-- 카테고리 탭 -->
+      <div class="px-4 py-3 border-b border-gray-100">
+        <p class="text-xs font-medium text-gray-500 mb-2">{{ t('ingredient.category') }}</p>
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            v-for="category in categories"
+            :key="category"
+            @click="activeCategory = activeCategory === category ? null : category"
+            :class="[
+              'px-3 py-1.5 text-sm rounded-lg transition-colors border',
+              activeCategory === category
+                ? 'bg-gray-900 text-white border-gray-900'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+            ]"
+          >
+            {{ category }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 카테고리 내 재료 -->
+      <div class="p-4 max-h-96 overflow-y-auto">
+        <p v-if="activeCategory" class="text-xs font-medium text-gray-500 mb-2">{{ t('ingredient.categoryItems', { category: activeCategory }) }}</p>
+        <div v-if="activeCategory" class="flex flex-wrap gap-1.5">
+          <button
+            v-for="ing in filteredIngredients"
+            :key="ing.id"
+            @click="toggleIngredient(ing)"
+            :class="[
+              'px-3 py-1.5 text-sm rounded-lg transition-colors',
+              isMyIngredient(ing)
+                ? isExcluded(ing.id)
+                  ? 'bg-gray-200 text-gray-400 line-through'
+                  : 'bg-emerald-600 text-white'
+                : isSelected(ing)
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            ]"
+          >
+            {{ ing.name }}
+          </button>
+        </div>
+        <p v-else class="text-sm text-gray-400 text-center py-4">
+          {{ t('ingredient.selectCategoryHint') }}
+        </p>
+      </div>
+    </template>
   </div>
 </template>

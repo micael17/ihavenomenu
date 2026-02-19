@@ -12,6 +12,7 @@ export function useDB(): Database.Database {
   console.log('[DB] Connecting to:', dbPath)
 
   db = new Database(dbPath, { readonly: true })
+  db.pragma('busy_timeout = 5000')
 
   return db
 }
@@ -20,7 +21,10 @@ export function useDB(): Database.Database {
 export interface Ingredient {
   id: number
   name: string
+  name_ko: string | null
+  name_en: string | null
   category: string | null
+  category_ko: string | null
   category_en: string | null
   parent_id: number | null
   is_base: boolean
@@ -40,6 +44,7 @@ export interface DishWithIngredients extends Dish {
   ingredients: string
   match_count: number
   total_count: number
+  dish_ingredient_count?: number
 }
 
 export interface Recipe {
