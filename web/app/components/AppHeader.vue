@@ -31,7 +31,9 @@ function handleLogin() {
     <div class="max-w-6xl mx-auto px-6 py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-8">
-          <NuxtLink to="/" class="text-xl font-semibold text-gray-900">I Have No Menu</NuxtLink>
+          <NuxtLink to="/" class="flex items-center">
+            <AppLogo size="md" />
+          </NuxtLink>
           <nav class="flex items-center gap-6">
             <NuxtLink
               to="/"

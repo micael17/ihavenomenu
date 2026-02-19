@@ -54,7 +54,56 @@ const youtubeEmbedUrl = computed(() => {
 
 useSeoMeta({
   title: () => recipe.value?.title ? `${recipe.value.title} - I Have No Menu` : `${t('recipe.recipe')} - I Have No Menu`,
-  description: () => recipe.value?.description || t('recipe.creatorRecipeDescription')
+  description: () => recipe.value?.description || t('recipe.creatorRecipeDescription'),
+  ogTitle: () => recipe.value?.title || 'Recipe',
+  ogDescription: () => recipe.value?.description || t('recipe.creatorRecipeDescription'),
+  ogImage: () => recipe.value?.image_url || recipe.value?.youtube_thumbnail || '/og-image.svg',
+  ogType: 'article'
+})
+
+// Recipe JSON-LD structured data
+const recipeJsonLd = computed(() => {
+  if (!recipe.value) return null
+
+  const r = recipe.value
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Recipe',
+    name: r.title,
+    description: r.description || '',
+    image: r.image_url || r.youtube_thumbnail || '',
+    author: {
+      '@type': 'Person',
+      name: r.nickname || r.channel_name || 'Creator'
+    },
+    prepTime: r.cooking_time ? `PT${r.cooking_time}M` : undefined,
+    cookTime: r.cooking_time ? `PT${r.cooking_time}M` : undefined,
+    recipeCategory: r.category || undefined,
+    recipeIngredient: r.ingredients?.map(i => {
+      const name = i.ingredient_name || i.custom_name || ''
+      return i.amount ? `${name} ${i.amount}` : name
+    }) || [],
+    recipeInstructions: r.steps?.map(step => ({
+      '@type': 'HowToStep',
+      position: step.step_number,
+      text: step.description,
+      image: step.image_url || undefined
+    })) || [],
+    video: r.youtube_video_id ? {
+      '@type': 'VideoObject',
+      name: r.title,
+      description: r.description || '',
+      thumbnailUrl: r.youtube_thumbnail || '',
+      embedUrl: `https://www.youtube.com/embed/${r.youtube_video_id}`
+    } : undefined
+  }
+})
+
+useHead({
+  script: computed(() => recipeJsonLd.value ? [{
+    type: 'application/ld+json',
+    innerHTML: JSON.stringify(recipeJsonLd.value)
+  }] : [])
 })
 </script>
 
