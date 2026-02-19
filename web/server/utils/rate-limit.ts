@@ -16,6 +16,8 @@ function cleanup() {
 }
 
 export function checkRateLimit(event: any, { maxRequests = 10, windowMs = 60000 } = {}): void {
+  const multiplier = parseInt(process.env.NUXT_RATE_LIMIT_MULTIPLIER || '1')
+  maxRequests = maxRequests * multiplier
   cleanup()
 
   const ip = getRequestIP(event, { xForwardedFor: true }) || 'unknown'
