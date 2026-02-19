@@ -49,7 +49,7 @@ interface YouTubeVideo {
 
 const route = useRoute()
 const { t, locale } = useI18n()
-const { selectedIngredients } = useRecipeSearch()
+const { allIngredients } = useRecipeSearch()
 const { isLoggedIn } = useAuth()
 
 const dishDetail = ref<DishDetail | null>(null)
@@ -87,7 +87,7 @@ async function loadDishDetail() {
 async function fetchYoutubeVideos(dishName: string, mainIngredients: string[] = []) {
   isLoadingYoutube.value = true
   try {
-    const ingredientNames = selectedIngredients.value.map(i => i.name).join(',')
+    const ingredientNames = allIngredients.value.map(i => i.name).join(',')
     const recipeSuffix = locale.value === 'en' ? 'recipe' : '레시피'
     const searchQuery = mainIngredients.length > 0
       ? `${dishName} ${recipeSuffix} ${mainIngredients.join(' ')}`
@@ -225,7 +225,7 @@ watch(() => route.params.id, () => {
             :key="ing.id"
             :class="[
               'text-sm px-3 py-1.5 rounded-lg',
-              ing.is_main ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'
+              allIngredients.some(s => s.name === ing.name) ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'
             ]"
           >
             {{ ing.name }}
