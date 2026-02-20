@@ -72,13 +72,15 @@ const recipeJsonLd = computed(() => {
     name: r.title,
     description: r.description || '',
     image: r.image_url || r.youtube_thumbnail || '',
+    url: `https://ihavenomenu.com/recipe/${r.id}`,
     author: {
       '@type': 'Person',
       name: r.nickname || r.channel_name || 'Creator'
     },
-    prepTime: r.cooking_time ? `PT${r.cooking_time}M` : undefined,
     cookTime: r.cooking_time ? `PT${r.cooking_time}M` : undefined,
+    totalTime: r.cooking_time ? `PT${r.cooking_time}M` : undefined,
     recipeCategory: r.category || undefined,
+    recipeYield: '1 serving',
     recipeIngredient: r.ingredients?.map(i => {
       const name = i.ingredient_name || i.custom_name || ''
       return i.amount ? `${name} ${i.amount}` : name
@@ -103,6 +105,10 @@ useHead({
   script: computed(() => recipeJsonLd.value ? [{
     type: 'application/ld+json',
     innerHTML: JSON.stringify(recipeJsonLd.value)
+  }] : []),
+  link: computed(() => recipe.value ? [{
+    rel: 'canonical',
+    href: `https://ihavenomenu.com/recipe/${recipe.value.id}`
   }] : [])
 })
 </script>

@@ -52,37 +52,65 @@ const { t, locale } = useI18n()
 const { allIngredients } = useRecipeSearch()
 const { isLoggedIn } = useAuth()
 
-const dishDetail = ref<DishDetail | null>(null)
 const youtubeVideos = ref<YouTubeVideo[]>([])
 const selectedVideo = ref<YouTubeVideo | null>(null)
 const hasYoutubeApiKey = ref(true)
-const isLoadingDetail = ref(true)
 const isLoadingYoutube = ref(false)
 
-// 요리 상세 정보 로드
-async function loadDishDetail() {
-  isLoadingDetail.value = true
-  youtubeVideos.value = []
+// SSR 대응: useFetch로 요리 상세 정보 로드
+const { data: dishDetail, status } = await useFetch<DishDetail>(
+  () => `/api/dishes/${route.params.id}`
+)
+const isLoadingDetail = computed(() => status.value === 'pending')
 
-  try {
-    const response = await $fetch(`/api/dishes/${route.params.id}`)
-    dishDetail.value = response as DishDetail
+// SEO Meta
+useSeoMeta({
+  title: () => dishDetail.value?.dish?.name
+    ? `${dishDetail.value.dish.name} - I Have No Menu`
+    : 'I Have No Menu',
+  description: () => {
+    const dish = dishDetail.value?.dish
+    if (!dish) return 'Find delicious recipes with the ingredients you already have.'
+    const ingredientNames = dishDetail.value?.ingredients?.slice(0, 5).map(i => i.name).join(', ') || ''
+    return dish.description || `${dish.name} - ${ingredientNames}`
+  },
+  ogTitle: () => dishDetail.value?.dish?.name || 'I Have No Menu',
+  ogDescription: () => dishDetail.value?.dish?.description || 'Find delicious recipes with the ingredients you already have.',
+  ogImage: () => dishDetail.value?.dish?.image_url || '/og-image.svg',
+  ogType: 'article'
+})
 
-    // 필수 재료(is_main=true) 최대 3개 추출
-    const mainIngredients = dishDetail.value.ingredients
-      .filter(ing => ing.is_main)
-      .slice(0, 3)
-      .map(ing => ing.name)
-
-    if (isLoggedIn.value) {
-      fetchYoutubeVideos(dishDetail.value.dish.name, mainIngredients)
-    }
-  } catch (error) {
-    console.error('상세 조회 오류:', error)
-  } finally {
-    isLoadingDetail.value = false
+// JSON-LD 구조화 데이터 + Canonical URL
+const dishJsonLd = computed(() => {
+  if (!dishDetail.value?.dish) return null
+  const d = dishDetail.value
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Recipe',
+    name: d.dish.name,
+    description: d.dish.description || '',
+    image: d.dish.image_url || '',
+    url: `https://ihavenomenu.com/${d.dish.id}`,
+    recipeCategory: d.dish.category || undefined,
+    recipeIngredient: d.ingredients.map(i => i.amount ? `${i.name} ${i.amount}` : i.name),
+    recipeInstructions: d.recipes?.[0]?.cooking_method
+      ? [{ '@type': 'HowToStep', text: d.recipes[0].cooking_method }]
+      : undefined,
+    cookTime: d.recipes?.[0]?.cooking_time ? `PT${d.recipes[0].cooking_time}M` : undefined,
+    recipeYield: d.recipes?.[0]?.servings || undefined
   }
-}
+})
+
+useHead({
+  script: computed(() => dishJsonLd.value ? [{
+    type: 'application/ld+json',
+    innerHTML: JSON.stringify(dishJsonLd.value)
+  }] : []),
+  link: computed(() => dishDetail.value?.dish ? [{
+    rel: 'canonical',
+    href: `https://ihavenomenu.com/${dishDetail.value.dish.id}`
+  }] : [])
+})
 
 async function fetchYoutubeVideos(dishName: string, mainIngredients: string[] = []) {
   isLoadingYoutube.value = true
@@ -171,15 +199,23 @@ function goBack() {
   navigateTo('/')
 }
 
-// 페이지 로드 시 상세 정보 가져오기
-onMounted(() => {
-  loadDishDetail()
-})
+// 클라이언트에서 dish 데이터 로드 시 YouTube 영상 검색
+if (import.meta.client) {
+  watch(dishDetail, (newVal) => {
+    if (!newVal) return
+    youtubeVideos.value = []
+    selectedVideo.value = null
 
-// 라우트 변경 시 다시 로드
-watch(() => route.params.id, () => {
-  loadDishDetail()
-})
+    const mainIngredients = newVal.ingredients
+      .filter(ing => ing.is_main)
+      .slice(0, 3)
+      .map(ing => ing.name)
+
+    if (isLoggedIn.value) {
+      fetchYoutubeVideos(newVal.dish.name, mainIngredients)
+    }
+  }, { immediate: true })
+}
 </script>
 
 <template>

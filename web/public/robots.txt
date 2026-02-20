@@ -1,4 +1,9 @@
 User-Agent: *
 Allow: /
+Disallow: /api/
+Disallow: /login
+Disallow: /my-fridge
+Disallow: /creator/
+Disallow: /dashboard
 
 Sitemap: https://ihavenomenu.com/sitemap.xml
