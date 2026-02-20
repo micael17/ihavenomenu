@@ -39,7 +39,7 @@ test.describe('Search - Locale', () => {
     await page.waitForLoadState('networkidle')
 
     // 영문 카테고리 확인
-    const categoryBtns = page.locator('.sticky .flex-wrap button.border')
+    const categoryBtns = page.getByTestId('category-list').locator('button')
     await expect(categoryBtns.first()).toBeVisible({ timeout: 10_000 })
     const enCategoryName = await categoryBtns.first().textContent()
 

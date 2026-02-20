@@ -23,7 +23,7 @@ test.describe('Search - Guest', () => {
 
     // "Category" 라벨 아래의 카테고리 버튼 클릭
     // IngredientSelector에서 카테고리 버튼은 border 클래스를 가짐
-    const categoryBtns = page.locator('.sticky .flex-wrap button.border')
+    const categoryBtns = page.getByTestId('category-list').locator('button')
     await expect(categoryBtns.first()).toBeVisible({ timeout: 10_000 })
 
     await categoryBtns.first().click()
@@ -41,12 +41,12 @@ test.describe('Search - Guest', () => {
     await page.waitForLoadState('networkidle')
 
     // 카테고리 클릭
-    const categoryBtns = page.locator('.sticky .flex-wrap button.border')
+    const categoryBtns = page.getByTestId('category-list').locator('button')
     await expect(categoryBtns.first()).toBeVisible({ timeout: 10_000 })
     await categoryBtns.first().click()
 
     // 하위 재료 중 첫 번째 클릭
-    const ingredientBtns = page.locator('.max-h-96 .flex-wrap button')
+    const ingredientBtns = page.getByTestId('ingredient-list').locator('button')
     await expect(ingredientBtns.first()).toBeVisible({ timeout: 5_000 })
     await ingredientBtns.first().click()
 
@@ -68,11 +68,11 @@ test.describe('Search - Guest', () => {
     await page.waitForLoadState('networkidle')
 
     // 카테고리 + 재료 선택
-    const categoryBtns = page.locator('.sticky .flex-wrap button.border')
+    const categoryBtns = page.getByTestId('category-list').locator('button')
     await expect(categoryBtns.first()).toBeVisible({ timeout: 10_000 })
     await categoryBtns.first().click()
 
-    const ingredientBtns = page.locator('.max-h-96 .flex-wrap button')
+    const ingredientBtns = page.getByTestId('ingredient-list').locator('button')
     await expect(ingredientBtns.first()).toBeVisible({ timeout: 5_000 })
     await ingredientBtns.first().click()
 
@@ -81,8 +81,8 @@ test.describe('Search - Guest', () => {
       resp.url().includes('/api/dishes/search') && resp.status() === 200
     )
 
-    // Korean First 버튼 클릭 → 새로운 검색 발생
-    const koreanBtn = page.locator('button', { hasText: 'Korean First' })
+    // Korean 버튼 클릭 → 새로운 검색 발생
+    const koreanBtn = page.locator('button', { hasText: 'Korean' })
     const secondSearch = page.waitForResponse(resp =>
       resp.url().includes('/api/dishes/search') && resp.status() === 200
     )
@@ -95,11 +95,11 @@ test.describe('Search - Guest', () => {
     await page.waitForLoadState('networkidle')
 
     // 카테고리 + 재료 선택
-    const categoryBtns = page.locator('.sticky .flex-wrap button.border')
+    const categoryBtns = page.getByTestId('category-list').locator('button')
     await expect(categoryBtns.first()).toBeVisible({ timeout: 10_000 })
     await categoryBtns.first().click()
 
-    const ingredientBtns = page.locator('.max-h-96 .flex-wrap button')
+    const ingredientBtns = page.getByTestId('ingredient-list').locator('button')
     await expect(ingredientBtns.first()).toBeVisible({ timeout: 5_000 })
     await ingredientBtns.first().click()
 
@@ -121,11 +121,11 @@ test.describe('Search - Guest', () => {
     await page.waitForLoadState('networkidle')
 
     // 카테고리 + 재료 선택
-    const categoryBtns = page.locator('.sticky .flex-wrap button.border')
+    const categoryBtns = page.getByTestId('category-list').locator('button')
     await expect(categoryBtns.first()).toBeVisible({ timeout: 10_000 })
     await categoryBtns.first().click()
 
-    const ingredientBtns = page.locator('.max-h-96 .flex-wrap button')
+    const ingredientBtns = page.getByTestId('ingredient-list').locator('button')
     await expect(ingredientBtns.first()).toBeVisible({ timeout: 5_000 })
     const firstIngName = await ingredientBtns.first().textContent()
     await ingredientBtns.first().click()

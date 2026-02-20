@@ -296,7 +296,7 @@ function toggleExcludeMyIngredient(ingredient: Ingredient) {
       <!-- 카테고리 탭 -->
       <div class="px-4 py-3 border-b border-gray-100">
         <p class="text-xs font-medium text-gray-500 mb-2">{{ t('ingredient.category') }}</p>
-        <div class="flex flex-wrap gap-1.5">
+        <div data-testid="category-list" class="flex flex-wrap gap-1.5">
           <button
             v-for="category in categories"
             :key="category"
@@ -316,7 +316,7 @@ function toggleExcludeMyIngredient(ingredient: Ingredient) {
       <!-- 카테고리 내 재료 -->
       <div class="p-4 max-h-96 overflow-y-auto">
         <p v-if="activeCategory" class="text-xs font-medium text-gray-500 mb-2">{{ t('ingredient.categoryItems', { category: activeCategory }) }}</p>
-        <div v-if="activeCategory" class="flex flex-wrap gap-1.5">
+        <div v-if="activeCategory" data-testid="ingredient-list" class="flex flex-wrap gap-1.5">
           <button
             v-for="ing in filteredIngredients"
             :key="ing.id"
