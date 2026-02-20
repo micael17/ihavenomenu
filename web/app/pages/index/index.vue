@@ -67,20 +67,20 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- 로딩 -->
-    <div v-if="isSearching" class="text-center py-12 text-gray-500">
+    <!-- 로딩 (초기 검색시만 - 이미 결과가 있으면 하단 스피너 사용) -->
+    <div v-if="isSearching && dishes.length === 0" class="text-center py-12 text-gray-500">
       <div class="inline-block animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-gray-600 mb-2"></div>
       <p>{{ t('home.searchingRecipes') }}</p>
     </div>
 
     <!-- 빈 상태 -->
-    <div v-else-if="allIngredients.length === 0" class="text-center py-16">
+    <div v-else-if="allIngredients.length === 0 && !isSearching" class="text-center py-16">
       <p class="text-5xl mb-4">🥕</p>
       <p class="text-gray-500">{{ t('home.selectIngredientsHint') }}</p>
     </div>
 
     <!-- 결과 없음 -->
-    <div v-else-if="dishes.length === 0" class="text-center py-16">
+    <div v-else-if="dishes.length === 0 && !isSearching" class="text-center py-16">
       <p class="text-5xl mb-4">😢</p>
       <p class="text-gray-500">{{ t('home.noRecipesFound') }}</p>
     </div>
