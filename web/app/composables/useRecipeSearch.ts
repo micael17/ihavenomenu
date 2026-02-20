@@ -30,6 +30,7 @@ const CACHE_MAX_SIZE = 50
 const CACHE_TTL = 5 * 60 * 1000 // 5분
 const RATE_LIMIT_COOLDOWN = 30 * 1000 // 30초 쿨다운
 const DEBOUNCE_MS = 400
+const SEARCH_DELAY_MS = 2000 // 부하 방지용 API 호출 전 딜레이
 const searchCache = new Map<string, { data: any; timestamp: number }>()
 
 let watcherRegistered = false
@@ -127,9 +128,10 @@ export function useRecipeSearch() {
       return
     }
 
-    // 캐시 MISS → API 호출
+    // 캐시 MISS → API 호출 (부하 방지용 2초 딜레이)
     isSearching.value = true
     try {
+      await new Promise(resolve => setTimeout(resolve, SEARCH_DELAY_MS))
       const ingredientIds = ingredients.map(i => i.id).join(',')
       const response = await $fetch<{
         userDishes: Dish[]
