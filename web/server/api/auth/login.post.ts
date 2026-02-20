@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  if (body.email.length > 64 || body.password.length > 16) {
+  if (body.email.length > 64 || body.password.length > 72) {
     throw createError({
       statusCode: 401,
       message: 'Invalid email or password'

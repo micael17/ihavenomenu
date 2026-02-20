@@ -33,11 +33,11 @@ const isSubmitting = ref(false)
 // 유효성 검사
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const isEmailValid = computed(() => !email.value || (email.value.length <= 64 && emailRegex.test(email.value)))
-const isPasswordValid = computed(() => !password.value || (password.value.length >= 8 && password.value.length <= 16))
+const isPasswordValid = computed(() => !password.value || (password.value.length >= 8 && password.value.length <= 72))
 const isFormValid = computed(() =>
   email.value && password.value
   && email.value.length <= 64 && emailRegex.test(email.value)
-  && password.value.length >= 8 && password.value.length <= 16
+  && password.value.length >= 8 && password.value.length <= 72
 )
 
 // 탭 전환 시 에러 초기화
@@ -146,7 +146,7 @@ function handleGoogleLogin() {
               <p v-if="password && password.length < 8" class="mt-1 text-xs text-red-500">
                 {{ t('auth.passwordMinError') }}
               </p>
-              <p v-else-if="password && password.length > 16" class="mt-1 text-xs text-red-500">
+              <p v-else-if="password && password.length > 72" class="mt-1 text-xs text-red-500">
                 {{ t('auth.passwordMaxError') }}
               </p>
             </div>

@@ -44,7 +44,7 @@
     "emailPlaceholder": "Enter your email",
     "passwordPlaceholder": "Enter your password",
     "passwordMinError": "At least 8 characters",
-    "passwordMaxError": "16 characters max",
+    "passwordMaxError": "72 characters max",
     "emailInvalid": "Invalid email format",
     "emailExists": "Email already registered",
     "emailConflict": "This email is already registered with another method. Please log in with email/password.",

@@ -4,8 +4,37 @@ import { getCookie, setCookie, deleteCookie, createError } from 'h3'
 import { findUserById, type User } from './user-db'
 
 const TOKEN_NAME = 'ihavenomenu_token'
-const TOKEN_MAX_AGE = 60 * 60 * 24 * 7 // 7일
+const TOKEN_MAX_AGE = 60 * 60 * 24 * 1 // 1일
 let jwtSecretWarned = false
+
+// 로그아웃된 토큰 블랙리스트 (메모리 기반)
+const tokenBlacklist = new Map<string, number>() // token -> expiry timestamp
+const BLACKLIST_CLEANUP_INTERVAL = 60 * 60 * 1000 // 1시간마다 정리
+let lastBlacklistCleanup = Date.now()
+
+function cleanupBlacklist() {
+  const now = Date.now()
+  if (now - lastBlacklistCleanup < BLACKLIST_CLEANUP_INTERVAL) return
+  lastBlacklistCleanup = now
+
+  for (const [token, expiry] of tokenBlacklist) {
+    if (now > expiry * 1000) {
+      tokenBlacklist.delete(token)
+    }
+  }
+}
+
+export function revokeToken(token: string): void {
+  const payload = verifyToken(token)
+  if (payload) {
+    tokenBlacklist.set(token, payload.exp)
+  }
+}
+
+export function isTokenRevoked(token: string): boolean {
+  cleanupBlacklist()
+  return tokenBlacklist.has(token)
+}
 
 export interface JwtPayload {
   userId: number
@@ -29,7 +58,7 @@ export function createToken(userId: number): string {
   return jwt.sign(
     { userId },
     config.jwtSecret,
-    { expiresIn: '7d' }
+    { expiresIn: '1d' }
   )
 }
 
@@ -65,6 +94,9 @@ export function getAuthToken(event: H3Event): string | null {
 export function getCurrentUser(event: H3Event): User | null {
   const token = getAuthToken(event)
   if (!token) return null
+
+  // 블랙리스트 체크 (로그아웃된 토큰 거부)
+  if (isTokenRevoked(token)) return null
 
   const payload = verifyToken(token)
   if (!payload) return null

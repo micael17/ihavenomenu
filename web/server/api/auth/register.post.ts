@@ -33,10 +33,10 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  if (body.password.length > 16) {
+  if (body.password.length > 72) {
     throw createError({
       statusCode: 400,
-      message: 'Password must be at most 16 characters'
+      message: 'Password must be at most 72 characters'
     })
   }
 

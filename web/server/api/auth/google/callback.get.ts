@@ -13,6 +13,8 @@ interface GoogleUserResponse {
 }
 
 export default defineEventHandler(async (event) => {
+  checkRateLimit(event, { maxRequests: 10, windowMs: 60 * 1000 })
+
   const config = useRuntimeConfig()
   const query = getQuery(event)
 
