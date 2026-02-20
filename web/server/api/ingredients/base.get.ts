@@ -46,12 +46,8 @@ export default defineEventHandler(async (event) => {
     sql += ` AND i.parent_id IS NULL`
   }
 
-  // name_ko 또는 name_en이 있는 재료만 표시 (locale에 따라)
-  if (locale === 'ko') {
-    sql += ` AND i.name_ko IS NOT NULL AND i.name_ko != ''`
-  } else {
-    sql += ` AND i.name_en IS NOT NULL AND i.name_en != ''`
-  }
+  // i18n 데이터가 있으면 해당 locale만, 없으면 원본 name 사용
+  // COALESCE로 폴백하므로 strict null 체크 제거 (서버 DB에 i18n 미적용 시에도 동작)
 
   if (orderByPopularity) {
     sql += ` ORDER BY display_category, usage_count DESC, display_name`

@@ -76,12 +76,17 @@ jobs:
           port: 22
           envs: NUXT_DB_PATH,NUXT_JWT_SECRET,NUXT_YOUTUBE_API_KEY,NUXT_GOOGLE_CLIENT_ID,NUXT_GOOGLE_CLIENT_SECRET,NUXT_GOOGLE_REDIRECT_URI
           script: |
-            echo "🔧 PM2 설치 확인..."
+            echo "🔧 의존성 확인..."
             if ! command -v pm2 &> /dev/null; then
               sudo npm install -g pm2
             fi
+            if ! command -v sqlite3 &> /dev/null; then
+              echo "📦 sqlite3 설치..."
+              sudo apt-get update -qq && sudo apt-get install -y -qq sqlite3
+            fi
 
             APP_DIR=/var/www/ihavenomenu
+            sudo mkdir -p $APP_DIR
 
             echo "📝 환경변수 파일 생성..."
             cat > $APP_DIR/.env << ENVEOF
@@ -100,6 +105,7 @@ jobs:
             echo "📂 빌드 결과물 이동..."
             sudo cp -r ~/ihavenomenu-tmp/web/.output $APP_DIR/.output-new
             sudo cp -r ~/ihavenomenu-tmp/database $APP_DIR/database-new
+            sudo cp ~/ihavenomenu-tmp/ecosystem.config.cjs $APP_DIR/ecosystem.config.cjs
 
             echo "📦 네이티브 모듈 설치..."
             cd $APP_DIR/.output-new/server
@@ -107,23 +113,50 @@ jobs:
 
             echo "🔄 기존 빌드 교체..."
             cd $APP_DIR
-            rm -rf .output-old database-old
+            rm -rf .output-old
             if [ -d .output ]; then mv .output .output-old; fi
             mv .output-new .output
 
             # DB 마이그레이션
             if [ ! -f database/ihavenomenu.db ]; then
               echo "🗄️ 최초 배포: DB 복사..."
-              mv database-new database
+              sudo mv database-new database
+              sudo chown -R ubuntu:ubuntu $APP_DIR/database
             else
               echo "🗄️ 기존 DB 마이그레이션..."
+              sudo chown -R ubuntu:ubuntu $APP_DIR/database-new
               chmod +x database-new/migrate.sh
               bash database-new/migrate.sh database/ihavenomenu.db database-new/ihavenomenu.db
+              if [ $? -ne 0 ]; then
+                echo "⚠️ 마이그레이션 스크립트 실패, Node.js로 재시도..."
+                node -e "
+                  const Database = require('./output/server/node_modules/better-sqlite3');
+                  const existDb = new Database('database/ihavenomenu.db');
+                  const cols = existDb.pragma('table_info(ingredients)').map(c => c.name);
+                  if (!cols.includes('name_ko')) existDb.exec('ALTER TABLE ingredients ADD COLUMN name_ko TEXT');
+                  if (!cols.includes('name_en')) existDb.exec('ALTER TABLE ingredients ADD COLUMN name_en TEXT');
+                  if (!cols.includes('category_ko')) existDb.exec('ALTER TABLE ingredients ADD COLUMN category_ko TEXT');
+                  if (!cols.includes('category_en')) existDb.exec('ALTER TABLE ingredients ADD COLUMN category_en TEXT');
+                  if (!cols.includes('parent_id')) existDb.exec('ALTER TABLE ingredients ADD COLUMN parent_id INTEGER');
+                  if (!cols.includes('is_base')) existDb.exec('ALTER TABLE ingredients ADD COLUMN is_base BOOLEAN DEFAULT 0');
+                  const dCols = existDb.pragma('table_info(dishes)').map(c => c.name);
+                  if (!dCols.includes('name_en')) existDb.exec('ALTER TABLE dishes ADD COLUMN name_en TEXT');
+                  // 새 DB에서 데이터 복사
+                  try {
+                    existDb.exec(\"ATTACH DATABASE 'database-new/ihavenomenu.db' AS newdb\");
+                    existDb.exec('UPDATE ingredients SET name_ko = (SELECT n.name_ko FROM newdb.ingredients n WHERE n.id = ingredients.id), name_en = (SELECT n.name_en FROM newdb.ingredients n WHERE n.id = ingredients.id), category_ko = (SELECT n.category_ko FROM newdb.ingredients n WHERE n.id = ingredients.id), category_en = (SELECT n.category_en FROM newdb.ingredients n WHERE n.id = ingredients.id), parent_id = (SELECT n.parent_id FROM newdb.ingredients n WHERE n.id = ingredients.id), is_base = (SELECT n.is_base FROM newdb.ingredients n WHERE n.id = ingredients.id) WHERE EXISTS (SELECT 1 FROM newdb.ingredients n WHERE n.id = ingredients.id)');
+                    existDb.exec(\"DETACH DATABASE newdb\");
+                    console.log('Node.js 마이그레이션 성공');
+                  } catch(e) { console.error('데이터 복사 실패:', e.message); }
+                  existDb.close();
+                " 2>&1 || echo "⚠️ Node.js 마이그레이션도 실패"
+              fi
               rm -rf database-new
             fi
 
             echo "🔄 앱 재시작..."
             sudo chown -R ubuntu:ubuntu $APP_DIR/.output
+            sudo chown -R ubuntu:ubuntu $APP_DIR/database
             pm2 delete ihavenomenu 2>/dev/null || true
             cd $APP_DIR && pm2 start ecosystem.config.cjs
 
@@ -135,6 +168,17 @@ jobs:
             sleep 3
             pm2 status
             pm2 save
+
+            # API 헬스체크
+            echo "🔍 API 헬스체크..."
+            sleep 2
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8031/api/ingredients/base 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ API 정상 (HTTP $HTTP_CODE)"
+            else
+              echo "⚠️ API 응답 비정상 (HTTP $HTTP_CODE)"
+              pm2 logs ihavenomenu --lines 20 --nostream
+            fi
 
             echo "✅ 배포 완료!"
 
