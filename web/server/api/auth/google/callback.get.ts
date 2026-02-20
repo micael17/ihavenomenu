@@ -76,7 +76,16 @@ export default defineEventHandler(async (event) => {
 
   const providerId = userResponse.sub
 
-  // 3. 사용자 생성 또는 조회
+  // 3. 이메일 충돌 체크: 같은 이메일로 이메일 가입된 계정이 있는지 확인
+  if (userResponse.email) {
+    const existingByEmail = findUserByEmailAnyProvider(userResponse.email)
+    if (existingByEmail && !(existingByEmail.provider === 'google' && existingByEmail.provider_id === providerId)) {
+      // 다른 계정(이메일 가입)에서 이미 사용 중인 이메일
+      return sendRedirect(event, '/login?error=email_conflict')
+    }
+  }
+
+  // 4. 사용자 생성 또는 조회
   const { user, isNew } = findOrCreateUser('google', providerId)
 
   // Google 프로필 정보 업데이트 (매 로그인 시 최신 정보로 갱신)

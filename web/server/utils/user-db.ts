@@ -273,12 +273,20 @@ export function findUserById(id: number): User | undefined {
   return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as User | undefined
 }
 
-// 이메일로 유저 조회
+// 이메일로 유저 조회 (이메일 가입 전용)
 export function findUserByEmail(email: string): User | undefined {
   const db = useUserDB()
   return db.prepare(
-    'SELECT * FROM users WHERE provider = ? AND email = ?'
+    'SELECT * FROM users WHERE provider = ? AND LOWER(email) = LOWER(?)'
   ).get('email', email) as User | undefined
+}
+
+// 이메일로 유저 조회 (모든 provider 대상 - 중복 체크용)
+export function findUserByEmailAnyProvider(email: string): User | undefined {
+  const db = useUserDB()
+  return db.prepare(
+    'SELECT * FROM users WHERE LOWER(email) = LOWER(?)'
+  ).get(email) as User | undefined
 }
 
 // 이메일 유저 생성

@@ -8,9 +8,18 @@ const route = useRoute()
 watch(isLoggedIn, (loggedIn) => {
   if (loggedIn) {
     const redirect = route.query.redirect as string
-    navigateTo(redirect || '/')
+    navigateTo(isSafeRedirect(redirect) ? redirect : '/')
   }
 }, { immediate: true })
+
+// 안전한 리다이렉트 URL인지 검증 (상대 경로만 허용)
+function isSafeRedirect(url: string | undefined): url is string {
+  if (!url) return false
+  return url.startsWith('/') && !url.startsWith('//')
+}
+
+// 구글 OAuth 콜백 에러 처리
+const googleError = route.query.error as string | undefined
 
 // 탭 상태
 const activeTab = ref<'login' | 'register'>('login')
@@ -44,12 +53,13 @@ async function handleSubmit() {
 
   try {
     const redirect = route.query.redirect as string
+    const safeRedirect = isSafeRedirect(redirect) ? redirect : null
     if (activeTab.value === 'register') {
       const response = await registerWithEmail(email.value, password.value)
-      navigateTo(response.redirectTo === '/onboarding' ? '/onboarding' : (redirect || response.redirectTo))
+      navigateTo(response.redirectTo === '/onboarding' ? '/onboarding' : (safeRedirect || response.redirectTo))
     } else {
       const response = await loginWithEmail(email.value, password.value)
-      navigateTo(response.redirectTo === '/onboarding' ? '/onboarding' : (redirect || response.redirectTo))
+      navigateTo(response.redirectTo === '/onboarding' ? '/onboarding' : (safeRedirect || response.redirectTo))
     }
   } catch (error: any) {
     const statusCode = error?.response?.status || error?.statusCode
@@ -142,7 +152,10 @@ function handleGoogleLogin() {
             </div>
 
             <!-- 에러 메시지 -->
-            <p v-if="errorMessage" class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+            <p v-if="googleError === 'email_conflict'" class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+              {{ t('auth.emailConflict') }}
+            </p>
+            <p v-else-if="errorMessage" class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
               {{ errorMessage }}
             </p>
 

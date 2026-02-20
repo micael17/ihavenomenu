@@ -47,6 +47,7 @@
     "passwordMaxError": "16 characters max",
     "emailInvalid": "Invalid email format",
     "emailExists": "Email already registered",
+    "emailConflict": "This email is already registered with another method. Please log in with email/password.",
     "loginFailed": "Invalid email or password"
   },
   "onboarding": {

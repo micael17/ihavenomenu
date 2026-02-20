@@ -40,8 +40,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // 이메일 중복 체크 - 타이밍 공격 방지를 위해 항상 해싱 수행
-  const existing = findUserByEmail(body.email)
+  // 이메일 중복 체크 (모든 provider 대상) - 타이밍 공격 방지를 위해 항상 해싱 수행
+  const normalizedEmail = body.email.toLowerCase().trim()
+  const existing = findUserByEmailAnyProvider(normalizedEmail)
   const passwordHash = await bcrypt.hash(body.password, 10)
 
   if (existing) {
@@ -52,7 +53,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // 유저 생성
-  const { user } = createEmailUser(body.email, passwordHash)
+  const { user } = createEmailUser(normalizedEmail, passwordHash)
 
   // JWT 토큰 생성 + 쿠키 설정
   const token = createToken(user.id)

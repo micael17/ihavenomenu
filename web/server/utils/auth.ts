@@ -15,8 +15,13 @@ export interface JwtPayload {
 
 export function createToken(userId: number): string {
   const config = useRuntimeConfig()
+  const isDefaultSecret = config.jwtSecret === 'ihavenomenu-secret-key-change-in-production'
 
-  if (!jwtSecretWarned && config.jwtSecret === 'ihavenomenu-secret-key-change-in-production') {
+  if (isDefaultSecret && process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: JWT_SECRET must be set in production. Server cannot issue tokens with default secret.')
+  }
+
+  if (!jwtSecretWarned && isDefaultSecret) {
     console.warn('[AUTH] ⚠️  WARNING: Using default JWT secret! Set JWT_SECRET environment variable for production.')
     jwtSecretWarned = true
   }
