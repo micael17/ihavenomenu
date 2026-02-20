@@ -168,6 +168,11 @@ export function useRecipeSearch() {
   }
 
   async function loadUserIngredients() {
+    const { isLoggedIn } = useAuth()
+    if (!isLoggedIn.value) {
+      myIngredients.value = []
+      return
+    }
     try {
       const response = await $fetch<{ ingredients: any[] }>('/api/user/ingredients')
       myIngredients.value = (response.ingredients || []).map((ui: any) => ({
@@ -176,7 +181,7 @@ export function useRecipeSearch() {
         category: ui.category
       }))
     } catch {
-      // 비로그인 시 무시
+      myIngredients.value = []
     }
   }
 
@@ -216,12 +221,14 @@ export function useRecipeSearch() {
     myIngredients.value = []
     selectedIngredients.value = []
     excludedMyIngredientIds.value = new Set()
+    cuisinePreference.value = 'mixed'
     cuisineSubCategory.value = null
     userDishes.value = []
     dbDishes.value = []
     currentPage.value = 1
     hasMore.value = false
     totalCount.value = 0
+    searchCache.clear()
   }
 
   function debouncedSearch() {

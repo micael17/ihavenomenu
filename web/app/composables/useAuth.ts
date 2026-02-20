@@ -30,12 +30,13 @@ export function useAuth() {
   async function logout() {
     try {
       await $fetch('/api/auth/logout', { method: 'POST' })
+    } catch (error) {
+      console.error('로그아웃 오류:', error)
+    } finally {
       user.value = null
       const { resetState } = useRecipeSearch()
       resetState()
       navigateTo('/')
-    } catch (error) {
-      console.error('로그아웃 오류:', error)
     }
   }
 

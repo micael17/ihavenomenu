@@ -36,10 +36,10 @@ async function loadRecommendations() {
       return
     }
     const ids = userIngredients.value.map((i: any) => i.ingredient_id).join(',')
-    const response = await $fetch<{ dishes: any[] }>('/api/dishes/search', {
+    const response = await $fetch<{ userDishes: any[]; dbDishes: any[] }>('/api/dishes/search', {
       query: { ids, limit: 4 }
     })
-    todayRecommendations.value = response.dishes
+    todayRecommendations.value = [...(response.userDishes || []), ...(response.dbDishes || [])].slice(0, 4)
   } catch (e) {
     console.error('추천 로드 오류:', e)
   } finally {
