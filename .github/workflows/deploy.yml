@@ -111,12 +111,14 @@ jobs:
             if [ -d .output ]; then mv .output .output-old; fi
             mv .output-new .output
 
-            # DB는 최초 배포 시에만 복사 (기존 DB 보존)
+            # DB 마이그레이션
             if [ ! -f database/ihavenomenu.db ]; then
               echo "🗄️ 최초 배포: DB 복사..."
               mv database-new database
             else
-              echo "🗄️ 기존 DB 유지..."
+              echo "🗄️ 기존 DB 마이그레이션..."
+              chmod +x database-new/migrate.sh
+              bash database-new/migrate.sh database/ihavenomenu.db database-new/ihavenomenu.db
               rm -rf database-new
             fi
 
