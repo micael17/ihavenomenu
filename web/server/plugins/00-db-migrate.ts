@@ -46,12 +46,33 @@ export default defineNitroPlugin(() => {
       migrated = true
     }
 
+    // recipes 테이블 i18n 컬럼 추가
+    const recipeCols = db.prepare("PRAGMA table_info(recipes)").all() as { name: string }[]
+    const recipeColNames = new Set(recipeCols.map(c => c.name))
+
+    const recipeMigrations = [
+      { col: 'title_en', sql: 'ALTER TABLE recipes ADD COLUMN title_en TEXT' },
+      { col: 'description_en', sql: 'ALTER TABLE recipes ADD COLUMN description_en TEXT' },
+      { col: 'ingredients_raw_en', sql: 'ALTER TABLE recipes ADD COLUMN ingredients_raw_en TEXT' },
+      { col: 'cooking_steps_en', sql: 'ALTER TABLE recipes ADD COLUMN cooking_steps_en TEXT' },
+      { col: 'cooking_method_en', sql: 'ALTER TABLE recipes ADD COLUMN cooking_method_en TEXT' },
+    ]
+
+    for (const m of recipeMigrations) {
+      if (!recipeColNames.has(m.col)) {
+        db.exec(m.sql)
+        console.log(`[Migration] recipes.${m.col} 컬럼 추가`)
+        migrated = true
+      }
+    }
+
     // 인덱스 추가
     db.exec('CREATE INDEX IF NOT EXISTS idx_ingredients_name_ko ON ingredients(name_ko)')
     db.exec('CREATE INDEX IF NOT EXISTS idx_ingredients_name_en ON ingredients(name_en)')
     db.exec('CREATE INDEX IF NOT EXISTS idx_ingredients_parent ON ingredients(parent_id)')
     db.exec('CREATE INDEX IF NOT EXISTS idx_ingredients_base ON ingredients(is_base)')
     db.exec('CREATE INDEX IF NOT EXISTS idx_dishes_name_en ON dishes(name_en)')
+    db.exec('CREATE INDEX IF NOT EXISTS idx_recipes_title_en ON recipes(title_en)')
 
     if (migrated) {
       console.log('[Migration] 스키마 마이그레이션 완료')

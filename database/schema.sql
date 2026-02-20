@@ -46,12 +46,17 @@ CREATE TABLE IF NOT EXISTS recipes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     dish_id INTEGER,                      -- 연결된 요리
     title TEXT NOT NULL,                  -- 레시피 제목
+    title_en TEXT,                        -- 영문 레시피 제목
     source TEXT,                          -- 출처 (예: 만개의레시피)
     source_id TEXT,                       -- 원본 ID
     description TEXT,                     -- 요리 소개
+    description_en TEXT,                  -- 영문 요리 소개
     ingredients_raw TEXT,                 -- 원본 재료 텍스트
+    ingredients_raw_en TEXT,              -- 영문 원본 재료 텍스트
     cooking_steps TEXT,                   -- 조리 순서 (JSON 배열)
+    cooking_steps_en TEXT,                -- 영문 조리 순서 (JSON 배열)
     cooking_method TEXT,                  -- 조리방법 (끓이기, 볶음 등)
+    cooking_method_en TEXT,               -- 영문 조리방법
     cooking_time TEXT,                    -- 조리시간
     servings TEXT,                        -- 인분
     difficulty TEXT,                      -- 난이도
@@ -77,6 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_dishes_category ON dishes(category);
 CREATE INDEX IF NOT EXISTS idx_dish_ingredients_dish ON dish_ingredients(dish_id);
 CREATE INDEX IF NOT EXISTS idx_dish_ingredients_ingredient ON dish_ingredients(ingredient_id);
 CREATE INDEX IF NOT EXISTS idx_recipes_dish ON recipes(dish_id);
+CREATE INDEX IF NOT EXISTS idx_recipes_title_en ON recipes(title_en);
 
 -- =============================================
 -- 재료로 요리 검색하는 뷰

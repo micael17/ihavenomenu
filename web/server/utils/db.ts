@@ -51,11 +51,16 @@ export interface Recipe {
   id: number
   dish_id: number
   title: string
+  title_en?: string | null
   source: string | null
   description: string | null
+  description_en?: string | null
   ingredients_raw: string | null
+  ingredients_raw_en?: string | null
   cooking_steps: string | null
+  cooking_steps_en?: string | null
   cooking_method: string | null
+  cooking_method_en?: string | null
   cooking_time: string | null
   servings: string | null
   difficulty: string | null

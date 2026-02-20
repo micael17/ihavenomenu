@@ -91,11 +91,28 @@ export default defineEventHandler(async (event) => {
       return (a.name || '').localeCompare(b.name || '')
     })
 
-  // 레시피 (1개만)
+  // 레시피 (1개만) - locale 기반 COALESCE
+  const recipeTitleField = locale === 'en'
+    ? 'COALESCE(title_en, title) as title'
+    : 'title'
+  const recipeDescField = locale === 'en'
+    ? 'COALESCE(description_en, description) as description'
+    : 'description'
+  const recipeIngredientsRawField = locale === 'en'
+    ? 'COALESCE(ingredients_raw_en, ingredients_raw) as ingredients_raw'
+    : 'ingredients_raw'
+  const recipeCookingMethodField = locale === 'en'
+    ? 'COALESCE(cooking_method_en, cooking_method) as cooking_method'
+    : 'cooking_method'
+  const recipeCookingStepsField = locale === 'en'
+    ? 'COALESCE(cooking_steps_en, cooking_steps) as cooking_steps'
+    : 'cooking_steps'
+
   const recipes = db.prepare(`
     SELECT
-      id, dish_id, title, source, description,
-      ingredients_raw, cooking_method, cooking_time,
+      id, dish_id, ${recipeTitleField}, source, ${recipeDescField},
+      ${recipeIngredientsRawField}, ${recipeCookingStepsField},
+      ${recipeCookingMethodField}, cooking_time,
       servings, difficulty, image_url
     FROM recipes
     WHERE dish_id = ?
