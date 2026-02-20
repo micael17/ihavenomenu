@@ -32,12 +32,15 @@ export function useAuth() {
       await $fetch('/api/auth/logout', { method: 'POST' })
     } catch (error) {
       console.error('로그아웃 오류:', error)
-    } finally {
-      user.value = null
+    }
+    user.value = null
+    try {
       const { resetState } = useRecipeSearch()
       resetState()
-      navigateTo('/')
+    } catch {
+      // 상태 초기화 실패해도 홈으로 이동
     }
+    await navigateTo('/', { replace: true })
   }
 
   function loginWithGoogle() {
