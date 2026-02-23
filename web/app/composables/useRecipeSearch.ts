@@ -46,14 +46,18 @@ export function useRecipeSearch() {
   const cuisineSubCategory = useState<string | null>('search-cuisine-sub-category', () => null)
   const userDishes = useState<Dish[]>('search-user-dishes', () => [])
   const dbDishes = useState<Dish[]>('search-db-dishes', () => [])
+  const popularDishes = useState<Dish[]>('search-popular-dishes', () => [])
   const isSearching = useState('search-is-searching', () => false)
   const isRateLimited = useState('search-rate-limited', () => false)
   const currentPage = useState('search-current-page', () => 1)
+  const popularPage = useState('search-popular-page', () => 1)
   const hasMore = useState('search-has-more', () => false)
+  const hasMorePopular = useState('search-has-more-popular', () => false)
   const totalCount = useState('search-total-count', () => 0)
 
   // 호환용 합산 computed
   const dishes = computed(() => [...userDishes.value, ...dbDishes.value])
+  const isPopularMode = computed(() => allIngredients.value.length === 0)
   const pageSize = 24
 
   const activeMyIngredients = computed(() =>
@@ -100,6 +104,57 @@ export function useRecipeSearch() {
     return searchQueue
   }
 
+  async function loadPopularDishes(page = 1) {
+    const offset = (page - 1) * pageSize
+    const cacheKey = `popular|${cuisinePreference.value}|${offset}|${locale.value}`
+
+    const cached = searchCache.get(cacheKey)
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      if (page === 1) popularDishes.value = cached.data.dishes || []
+      else popularDishes.value = [...popularDishes.value, ...(cached.data.dishes || [])]
+      popularPage.value = page
+      hasMorePopular.value = cached.data.hasMore
+      totalCount.value = cached.data.total
+      return
+    }
+
+    isSearching.value = true
+    try {
+      const response = await $fetch<{
+        dishes: Dish[]
+        total: number
+        hasMore: boolean
+      }>('/api/dishes/popular', {
+        query: {
+          offset,
+          limit: pageSize,
+          cuisine: cuisinePreference.value
+        }
+      })
+
+      searchCache.set(cacheKey, { data: response, timestamp: Date.now() })
+      if (searchCache.size > CACHE_MAX_SIZE) {
+        searchCache.delete(searchCache.keys().next().value!)
+      }
+
+      if (page === 1) popularDishes.value = response.dishes || []
+      else popularDishes.value = [...popularDishes.value, ...(response.dishes || [])]
+      popularPage.value = page
+      hasMorePopular.value = response.hasMore
+      totalCount.value = response.total
+      isRateLimited.value = false
+    } catch (error: any) {
+      if (error?.statusCode === 429 || error?.status === 429) {
+        isRateLimited.value = true
+        setTimeout(() => { isRateLimited.value = false }, RATE_LIMIT_COOLDOWN)
+      } else {
+        console.error('인기 레시피 로드 오류:', error)
+      }
+    } finally {
+      isSearching.value = false
+    }
+  }
+
   async function executeSearch(page: number) {
     const ingredients = allIngredients.value
     if (ingredients.length === 0) {
@@ -107,7 +162,15 @@ export function useRecipeSearch() {
       dbDishes.value = []
       totalCount.value = 0
       hasMore.value = false
+      await loadPopularDishes(1)
       return
+    }
+    // 재료가 선택되면 인기 레시피 초기화
+    if (popularDishes.value.length > 0) {
+      popularDishes.value = []
+      popularPage.value = 1
+      hasMorePopular.value = false
+      totalCount.value = 0
     }
 
     const offset = (page - 1) * pageSize
@@ -163,8 +226,14 @@ export function useRecipeSearch() {
   }
 
   function loadMore() {
-    if (!hasMore.value || isSearching.value) return
-    searchDishes(currentPage.value + 1)
+    if (isSearching.value) return
+    if (isPopularMode.value) {
+      if (!hasMorePopular.value) return
+      loadPopularDishes(popularPage.value + 1)
+    } else {
+      if (!hasMore.value) return
+      searchDishes(currentPage.value + 1)
+    }
   }
 
   async function loadUserIngredients() {
@@ -225,8 +294,11 @@ export function useRecipeSearch() {
     cuisineSubCategory.value = null
     userDishes.value = []
     dbDishes.value = []
+    popularDishes.value = []
     currentPage.value = 1
+    popularPage.value = 1
     hasMore.value = false
+    hasMorePopular.value = false
     totalCount.value = 0
     searchCache.clear()
   }
@@ -267,10 +339,13 @@ export function useRecipeSearch() {
     cuisineSubCategory,
     userDishes: readonly(userDishes),
     dbDishes: readonly(dbDishes),
+    popularDishes: readonly(popularDishes),
     dishes,
+    isPopularMode,
     isSearching: readonly(isSearching),
     isRateLimited: readonly(isRateLimited),
     hasMore: readonly(hasMore),
+    hasMorePopular: readonly(hasMorePopular),
     totalCount: readonly(totalCount),
     activeMyIngredients,
     allIngredients,

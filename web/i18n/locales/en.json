@@ -138,6 +138,8 @@
     "creatorRecipeCount": "{count} recipes",
     "creatorBadge": "Creator",
     "matchCount": "{match}/{total} matched",
+    "popularRecipes": "How about these recipes?",
+    "popularRecipesHint": "Select ingredients to find personalized recipes!",
     "rateLimitTitle": "Too many requests",
     "rateLimitMessage": "Please wait a moment. You can still browse the recipes shown below."
   },

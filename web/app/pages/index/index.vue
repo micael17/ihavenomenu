@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { selectedIngredients, allIngredients, userDishes, dbDishes, dishes, isSearching, isRateLimited, hasMore, totalCount, loadMore } = useRecipeSearch()
+const { selectedIngredients, allIngredients, userDishes, dbDishes, popularDishes, dishes, isPopularMode, isSearching, isRateLimited, hasMore, hasMorePopular, totalCount, loadMore } = useRecipeSearch()
 const { t } = useI18n()
 
 // 무한 스크롤을 위한 Intersection Observer
@@ -21,8 +21,12 @@ function setupObserver() {
 
   observer.value = new IntersectionObserver(
     (entries) => {
-      if (entries[0].isIntersecting && hasMore.value && !isSearching.value) {
-        loadMore()
+      if (entries[0]?.isIntersecting && !isSearching.value) {
+        if (isPopularMode.value && hasMorePopular.value) {
+          loadMore()
+        } else if (!isPopularMode.value && hasMore.value) {
+          loadMore()
+        }
       }
     },
     { rootMargin: '200px' }
@@ -68,16 +72,54 @@ onUnmounted(() => {
     </div>
 
     <!-- 로딩 (초기 검색시만 - 이미 결과가 있으면 하단 스피너 사용) -->
-    <div v-if="isSearching && dishes.length === 0" class="text-center py-12 text-gray-500">
+    <div v-if="isSearching && dishes.length === 0 && popularDishes.length === 0" class="text-center py-12 text-gray-500">
       <div class="inline-block animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-gray-600 mb-2"></div>
       <p>{{ t('home.searchingRecipes') }}</p>
     </div>
 
-    <!-- 빈 상태 -->
-    <div v-else-if="allIngredients.length === 0 && !isSearching" class="text-center py-16">
-      <p class="text-5xl mb-4">🥕</p>
-      <p class="text-gray-500">{{ t('home.selectIngredientsHint') }}</p>
-    </div>
+    <!-- 재료 미선택 시: 안내 + 인기 레시피 -->
+    <template v-else-if="isPopularMode && (!isSearching || popularDishes.length > 0)">
+      <!-- CTA 안내 -->
+      <div class="mb-6 bg-orange-50 border border-orange-100 rounded-xl p-4 flex items-center gap-3">
+        <span class="text-3xl flex-shrink-0">🥕</span>
+        <p class="text-sm text-orange-700">{{ t('home.popularRecipesHint') }}</p>
+      </div>
+
+      <!-- 인기 레시피 그리드 -->
+      <div v-if="popularDishes.length > 0">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">{{ t('home.popularRecipes') }}</h2>
+        <div class="grid grid-cols-2 gap-4">
+          <button
+            v-for="dish in popularDishes"
+            :key="`popular-${dish.id}`"
+            @click="viewDish(dish)"
+            class="bg-white border border-gray-200 rounded-lg p-4 text-left hover:border-gray-400 transition-colors relative"
+          >
+            <div class="flex gap-4">
+              <div class="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                <img
+                  v-if="dish.image_url"
+                  :src="dish.image_url"
+                  :alt="dish.name"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                <div v-else class="w-full h-full flex items-center justify-center">
+                  <span class="text-2xl">🍽️</span>
+                </div>
+              </div>
+
+              <div class="flex-1 min-w-0">
+                <h3 class="font-medium text-gray-900">{{ dish.name }}</h3>
+                <p v-if="dish.category" class="text-xs mt-1">
+                  <span class="px-2 py-0.5 bg-gray-100 text-gray-500 rounded">{{ dish.category }}</span>
+                </p>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </template>
 
     <!-- 결과 없음 -->
     <div v-else-if="dishes.length === 0 && !isSearching" class="text-center py-16">
@@ -181,17 +223,23 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <!-- 더 불러오기 트리거 & 로딩 표시 -->
-      <div ref="loadMoreTrigger" class="py-8 text-center">
-        <div v-if="isSearching" class="text-gray-500">
-          <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600 mb-1"></div>
-          <p class="text-sm">{{ t('home.loadingMore') }}</p>
-        </div>
-        <p v-else-if="!hasMore && dishes.length > 0" class="text-sm text-gray-400">
+    </template>
+
+    <!-- 공통 더 불러오기 트리거 & 로딩 표시 -->
+    <div v-if="popularDishes.length > 0 || dishes.length > 0" ref="loadMoreTrigger" class="py-8 text-center">
+      <div v-if="isSearching" class="text-gray-500">
+        <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600 mb-1"></div>
+        <p class="text-sm">{{ t('home.loadingMore') }}</p>
+      </div>
+      <template v-else>
+        <p v-if="isPopularMode && !hasMorePopular && popularDishes.length > 0" class="text-sm text-gray-400">
           {{ t('home.allRecipesLoaded') }}
         </p>
-      </div>
-    </template>
+        <p v-else-if="!isPopularMode && !hasMore && dishes.length > 0" class="text-sm text-gray-400">
+          {{ t('home.allRecipesLoaded') }}
+        </p>
+      </template>
+    </div>
   </div>
 </template>
 
