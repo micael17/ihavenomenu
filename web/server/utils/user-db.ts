@@ -14,6 +14,7 @@ export function useUserDB(): Database.Database {
   userDb = new Database(dbPath, { readonly: false })
   userDb.pragma('journal_mode = WAL')
   userDb.pragma('busy_timeout = 5000')
+  userDb.pragma('foreign_keys = ON')
 
   // 사용자 테이블 초기화
   initUserTables(userDb)
@@ -128,6 +129,43 @@ function initUserTables(db: Database.Database) {
     )
   `)
 
+  // 리뷰 테이블
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id INTEGER NOT NULL,
+      rating INTEGER NOT NULL,
+      content TEXT,
+      photo_urls TEXT,
+      ingredient_ids TEXT,
+      like_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      UNIQUE(user_id, target_type, target_id)
+    )
+  `)
+
+  // 리뷰 좋아요 테이블
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS review_likes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      review_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (review_id) REFERENCES reviews(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      UNIQUE(review_id, user_id)
+    )
+  `)
+
+  // 리뷰 인덱스
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_reviews_target ON reviews(target_type, target_id)`)
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(user_id)`)
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_review_likes_review ON review_likes(review_id)`)
+
   // password_hash 컬럼 마이그레이션 (기존 DB 대응)
   try {
     db.exec(`ALTER TABLE users ADD COLUMN password_hash TEXT`)
@@ -203,6 +241,27 @@ export interface UserRecipeStep {
   step_number: number
   description: string
   image_url: string | null
+}
+
+export interface Review {
+  id: number
+  user_id: number
+  target_type: 'dish' | 'user_recipe'
+  target_id: number
+  rating: number
+  content: string | null
+  photo_urls: string | null
+  ingredient_ids: string | null
+  like_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ReviewLike {
+  id: number
+  review_id: number
+  user_id: number
+  created_at: string
 }
 
 // 사용자 프로필 업데이트
@@ -708,4 +767,115 @@ export function deleteUserRecipe(recipeId: number, creatorId: number) {
   db.prepare('UPDATE creators SET recipe_count = MAX(recipe_count - 1, 0) WHERE id = ?').run(creatorId)
 
   return { deleted: true }
+}
+
+// ==================== 리뷰 관련 ====================
+
+export function getReviews(
+  targetType: string,
+  targetId: number,
+  options: { offset?: number; limit?: number; userId?: number } = {}
+) {
+  const db = useUserDB()
+  const { offset = 0, limit = 20, userId } = options
+
+  const reviews = db.prepare(`
+    SELECT r.*, u.nickname, u.profile_image
+    FROM reviews r
+    JOIN users u ON r.user_id = u.id
+    WHERE r.target_type = ? AND r.target_id = ?
+    ORDER BY r.created_at DESC
+    LIMIT ? OFFSET ?
+  `).all(targetType, targetId, limit, offset) as any[]
+
+  const countResult = db.prepare(`
+    SELECT COUNT(*) as total FROM reviews WHERE target_type = ? AND target_id = ?
+  `).get(targetType, targetId) as { total: number }
+
+  const avgResult = db.prepare(`
+    SELECT AVG(rating) as avg_rating FROM reviews WHERE target_type = ? AND target_id = ?
+  `).get(targetType, targetId) as { avg_rating: number | null }
+
+  // 현재 사용자의 좋아요 상태
+  let likedReviewIds: Set<number> = new Set()
+  if (userId && reviews.length > 0) {
+    const likes = db.prepare(`
+      SELECT review_id FROM review_likes WHERE user_id = ? AND review_id IN (${reviews.map(() => '?').join(',')})
+    `).all(userId, ...reviews.map(r => r.id)) as { review_id: number }[]
+    likedReviewIds = new Set(likes.map(l => l.review_id))
+  }
+
+  return {
+    reviews: reviews.map(r => ({
+      ...r,
+      photo_urls: r.photo_urls ? JSON.parse(r.photo_urls) : [],
+      ingredient_ids: r.ingredient_ids ? JSON.parse(r.ingredient_ids) : [],
+      liked: likedReviewIds.has(r.id)
+    })),
+    total: countResult.total,
+    avgRating: avgResult.avg_rating ? Math.round(avgResult.avg_rating * 10) / 10 : 0
+  }
+}
+
+export function createReview(data: {
+  userId: number
+  targetType: string
+  targetId: number
+  rating: number
+  content?: string
+  photoUrls?: string[]
+  ingredientIds?: number[]
+}): number {
+  const db = useUserDB()
+  const result = db.prepare(`
+    INSERT INTO reviews (user_id, target_type, target_id, rating, content, photo_urls, ingredient_ids)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    data.userId,
+    data.targetType,
+    data.targetId,
+    data.rating,
+    data.content || null,
+    data.photoUrls && data.photoUrls.length > 0 ? JSON.stringify(data.photoUrls) : null,
+    data.ingredientIds && data.ingredientIds.length > 0 ? JSON.stringify(data.ingredientIds) : null
+  )
+  return result.lastInsertRowid as number
+}
+
+export function deleteReview(reviewId: number, userId: number): { deleted: boolean } {
+  const db = useUserDB()
+  const result = db.prepare(`
+    DELETE FROM reviews WHERE id = ? AND user_id = ?
+  `).run(reviewId, userId)
+  return { deleted: result.changes > 0 }
+}
+
+export function toggleReviewLike(reviewId: number, userId: number): { liked: boolean; likeCount: number } | null {
+  const db = useUserDB()
+
+  // 리뷰 존재 확인
+  const review = db.prepare('SELECT id, like_count FROM reviews WHERE id = ?').get(reviewId) as { id: number; like_count: number } | undefined
+  if (!review) return null
+
+  const existing = db.prepare(`
+    SELECT id FROM review_likes WHERE review_id = ? AND user_id = ?
+  `).get(reviewId, userId) as { id: number } | undefined
+
+  if (existing) {
+    db.prepare('DELETE FROM review_likes WHERE id = ?').run(existing.id)
+    db.prepare('UPDATE reviews SET like_count = MAX(like_count - 1, 0) WHERE id = ?').run(reviewId)
+  } else {
+    db.prepare('INSERT INTO review_likes (review_id, user_id) VALUES (?, ?)').run(reviewId, userId)
+    db.prepare('UPDATE reviews SET like_count = like_count + 1 WHERE id = ?').run(reviewId)
+  }
+
+  const updated = db.prepare('SELECT like_count FROM reviews WHERE id = ?').get(reviewId) as { like_count: number }
+  return { liked: !existing, likeCount: updated.like_count }
+}
+
+export function getUserReviewForTarget(userId: number, targetType: string, targetId: number): Review | undefined {
+  const db = useUserDB()
+  return db.prepare(`
+    SELECT * FROM reviews WHERE user_id = ? AND target_type = ? AND target_id = ?
+  `).get(userId, targetType, targetId) as Review | undefined
 }

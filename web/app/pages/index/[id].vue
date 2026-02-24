@@ -459,6 +459,9 @@ if (import.meta.client) {
           </div>
         </a>
       </section>
+
+      <!-- 리뷰 섹션 -->
+      <ReviewReviewSection target-type="dish" :target-id="Number(route.params.id)" />
     </div>
 
     <!-- 오류 -->

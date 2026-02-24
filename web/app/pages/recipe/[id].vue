@@ -257,6 +257,9 @@ useHead({
             </li>
           </ol>
         </div>
+
+        <!-- 리뷰 섹션 -->
+        <ReviewReviewSection v-if="recipe" target-type="user_recipe" :target-id="Number(recipeId)" />
       </div>
 
       <!-- 로딩 -->

@@ -189,7 +189,12 @@
     "subKoreanStew": "찌개",
     "subKoreanRice": "밥/죽/떡",
     "subKoreanNoodle": "면/만두",
-    "subKoreanKimchi": "김치/젓갈/장류"
+    "subKoreanKimchi": "김치/젓갈/장류",
+    "cuisineBabyfood": "🍼 이유식",
+    "subBabyfoodEarly": "초기(4-6개월)",
+    "subBabyfoodMid": "중기(7-8개월)",
+    "subBabyfoodLate": "후기(9-11개월)",
+    "subBabyfoodComplete": "완료기(12개월+)"
   },
   "nav": {
     "home": "홈",
@@ -332,6 +337,33 @@
       "medium": "보통",
       "hard": "어려움"
     }
+  },
+  "review": {
+    "title": "만들어봤어요",
+    "writeReview": "나도 만들어봤어요!",
+    "noReviews": "아직 후기가 없어요",
+    "beFirstReviewer": "첫 번째 후기를 남겨보세요!",
+    "loginToReview": "로그인하면 후기를 남길 수 있어요",
+    "ratingRequired": "별점을 선택해주세요",
+    "ratingLabel": "별점",
+    "contentPlaceholder": "어떻게 만드셨나요? 맛은 어땠나요?",
+    "photoUrlPlaceholder": "사진 URL (https://...)",
+    "addPhoto": "사진 추가",
+    "photoLimit": "사진은 최대 3장까지",
+    "ingredientsUsed": "사용한 재료",
+    "ingredientsUsedHint": "실제로 사용한 재료를 선택해주세요",
+    "submit": "후기 등록",
+    "submitting": "등록 중...",
+    "submitError": "후기 등록에 실패했습니다",
+    "deleteConfirm": "정말 삭제하시겠습니까?",
+    "helpful": "도움이 됐어요",
+    "avgRating": "평균 {rating}점",
+    "reviewCount": "후기 {count}개",
+    "loadMore": "후기 더 보기",
+    "myReview": "내 후기",
+    "cancel": "취소",
+    "alreadyReviewed": "이미 후기를 작성했어요",
+    "anonymous": "익명"
   },
   "recipeDetail": {
     "backToSearch": "검색 결과로 돌아가기",

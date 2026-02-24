@@ -189,7 +189,12 @@
     "subKoreanStew": "Stew",
     "subKoreanRice": "Rice/Porridge",
     "subKoreanNoodle": "Noodle/Dumpling",
-    "subKoreanKimchi": "Kimchi/Fermented"
+    "subKoreanKimchi": "Kimchi/Fermented",
+    "cuisineBabyfood": "🍼 Baby Food",
+    "subBabyfoodEarly": "Early (4-6 months)",
+    "subBabyfoodMid": "Mid (7-8 months)",
+    "subBabyfoodLate": "Late (9-11 months)",
+    "subBabyfoodComplete": "Complete (12+ months)"
   },
   "nav": {
     "home": "Home",
@@ -332,6 +337,33 @@
       "medium": "Medium",
       "hard": "Hard"
     }
+  },
+  "review": {
+    "title": "I Made It!",
+    "writeReview": "I made this too!",
+    "noReviews": "No reviews yet",
+    "beFirstReviewer": "Be the first to leave a review!",
+    "loginToReview": "Log in to leave a review",
+    "ratingRequired": "Please select a rating",
+    "ratingLabel": "Rating",
+    "contentPlaceholder": "How did you make it? How did it taste?",
+    "photoUrlPlaceholder": "Photo URL (https://...)",
+    "addPhoto": "Add photo",
+    "photoLimit": "Up to 3 photos",
+    "ingredientsUsed": "Ingredients used",
+    "ingredientsUsedHint": "Select the ingredients you actually used",
+    "submit": "Submit review",
+    "submitting": "Submitting...",
+    "submitError": "Failed to submit review",
+    "deleteConfirm": "Are you sure you want to delete?",
+    "helpful": "Helpful",
+    "avgRating": "Average {rating}",
+    "reviewCount": "{count} reviews",
+    "loadMore": "Load more reviews",
+    "myReview": "My review",
+    "cancel": "Cancel",
+    "alreadyReviewed": "You already wrote a review",
+    "anonymous": "Anonymous"
   },
   "recipeDetail": {
     "backToSearch": "Back to search results",
